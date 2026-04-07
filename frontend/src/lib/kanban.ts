@@ -161,6 +161,59 @@ export const moveCard = (
   });
 };
 
+export function moveCardInBoard(board: BoardData, cardId: string, targetId: string): BoardData | null {
+  const card = board.cards[cardId];
+  if (!card) return null;
+
+  // Find source column
+  const sourceColumn = board.columns.find(col => col.cardIds.includes(cardId));
+  if (!sourceColumn) return null;
+
+  // If target is a column
+  const targetColumn = board.columns.find(col => col.id === targetId);
+  if (targetColumn) {
+    // Move to end of target column
+    const newSourceCardIds = sourceColumn.cardIds.filter(id => id !== cardId);
+    const newTargetCardIds = [...targetColumn.cardIds, cardId];
+
+    return {
+      ...board,
+      columns: board.columns.map(col => {
+        if (col.id === sourceColumn.id) return { ...col, cardIds: newSourceCardIds };
+        if (col.id === targetColumn.id) return { ...col, cardIds: newTargetCardIds };
+        return col;
+      })
+    };
+  }
+
+  // If target is another card
+  const targetCard = board.cards[targetId];
+  if (targetCard) {
+    const targetColumn = board.columns.find(col => col.cardIds.includes(targetId));
+    if (!targetColumn) return null;
+
+    // Insert before target card
+    const newSourceCardIds = sourceColumn.cardIds.filter(id => id !== cardId);
+    const targetIndex = targetColumn.cardIds.indexOf(targetId);
+    const newTargetCardIds = [
+      ...targetColumn.cardIds.slice(0, targetIndex),
+      cardId,
+      ...targetColumn.cardIds.slice(targetIndex)
+    ];
+
+    return {
+      ...board,
+      columns: board.columns.map(col => {
+        if (col.id === sourceColumn.id) return { ...col, cardIds: newSourceCardIds };
+        if (col.id === targetColumn.id) return { ...col, cardIds: newTargetCardIds };
+        return col;
+      })
+    };
+  }
+
+  return null;
+}
+
 export const createId = (prefix: string) => {
   const randomPart = Math.random().toString(36).slice(2, 8);
   const timePart = Date.now().toString(36);

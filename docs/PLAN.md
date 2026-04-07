@@ -46,35 +46,35 @@
 **Success Criteria:** Login required to access Kanban; valid credentials work; invalid fail; logout clears session; UI updates accordingly.
 
 ## Part 5: Database Schema Design
-- [ ] Design SQLite schema for users and kanban boards
-- [ ] Define tables: users (id, username), boards (id, user_id, data JSON)
-- [ ] Create docs/DATABASE.md with schema diagram and rationale
-- [ ] Propose initial data migration
-- [ ] Get user sign-off on schema
+- [x] Design SQLite schema for users and kanban boards
+- [x] Define tables: users (id, username), boards (id, user_id, data JSON)
+- [x] Create docs/DATABASE.md with schema diagram and rationale
+- [x] Propose initial data migration
+- [x] Get user sign-off on schema
 
 **Tests:** N/A (design document).
 
 **Success Criteria:** DATABASE.md exists with clear schema; user approves design.
 
 ## Part 6: Backend API for Kanban
-- [ ] Set up SQLAlchemy with SQLite database
-- [ ] Create database models for User and Board
-- [ ] Implement API routes: GET /api/board (get user's board), PUT /api/board (update board)
-- [ ] Add database initialization on startup
-- [ ] Handle user authentication in API (session-based)
-- [ ] Write comprehensive backend unit tests
+- [x] Set up SQLAlchemy with SQLite database
+- [x] Create database models for User and Board
+- [x] Implement API routes: GET /api/board (get user's board), PUT /api/board (update board)
+- [x] Add database initialization on startup
+- [x] Handle user authentication in API (session-based)
+- [x] Write comprehensive backend unit tests
 
 **Tests:** Unit tests for all API endpoints, database operations, auth middleware.
 
 **Success Criteria:** API returns correct board data for authenticated user; updates persist to database; invalid auth returns 401; all tests pass.
 
 ## Part 7: Frontend-Backend Integration
-- [ ] Replace local state in KanbanBoard with API calls
-- [ ] Add fetch functions for getting/updating board
-- [ ] Implement optimistic updates for drag operations
-- [ ] Handle API errors gracefully (retry, user feedback)
-- [ ] Update tests to mock API calls
-- [ ] Run full e2e tests with backend
+- [x] Replace local state in KanbanBoard with API calls
+- [x] Add fetch functions for getting/updating board
+- [x] Implement optimistic updates for drag operations
+- [x] Handle API errors gracefully (retry, user feedback)
+- [x] Update tests to mock API calls
+- [x] Run full e2e tests with backend
 
 **Tests:** Unit tests with mocked API; integration tests with real backend; e2e tests.
 
