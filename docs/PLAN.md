@@ -81,11 +81,11 @@
 **Success Criteria:** Kanban board loads from database; changes persist; drag operations work with backend; error handling works; all tests pass.
 
 ## Part 8: AI Connectivity Setup
-- [ ] Install OpenRouter SDK in backend
-- [ ] Create AI service module with OpenRouter client
-- [ ] Implement simple test endpoint: POST /api/ai/test (send "2+2" and expect "4")
-- [ ] Configure OPENROUTER_API_KEY from .env
-- [ ] Test connectivity with real API call
+- [x] Install OpenRouter SDK in backend
+- [x] Create AI service module with OpenRouter client
+- [x] Implement simple test endpoint: POST /api/ai/test (send "2+2" and expect "4")
+- [x] Configure OPENROUTER_API_KEY from .env
+- [x] Test connectivity with real API call
 
 **Tests:** Unit test for AI service; integration test for API connectivity.
 

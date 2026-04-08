@@ -3,7 +3,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 import os
+from dotenv import load_dotenv
+
+# Load environment variables first
+load_dotenv()
+
 from models import get_db, init_db, User, Board
+from ai_service import ai_service
 
 app = FastAPI()
 
@@ -16,6 +22,15 @@ def startup_event():
 @app.get("/api/hello")
 async def hello():
     return {"message": "Hello from FastAPI backend!"}
+
+@app.post("/api/ai/test")
+async def test_ai(prompt: str = "What is 2+2?"):
+    """Test AI connectivity with a simple prompt."""
+    try:
+        response = await ai_service.test_connection(prompt)
+        return {"response": response, "success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/board")
 async def get_board(db: Session = Depends(get_db)):
@@ -41,7 +56,13 @@ async def update_board(board_data: dict, db: Session = Depends(get_db)):
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
 
-    board.data = board_data["board"]
+    # Ensure board data is always stored as JSON string
+    board_content = board_data["board"]
+    if isinstance(board_content, dict):
+        import json
+        board.data = json.dumps(board_content)
+    else:
+        board.data = board_content
     db.commit()
     return {"message": "Board updated"}
 

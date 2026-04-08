@@ -13,6 +13,9 @@ WORKDIR /app
 COPY backend/requirements.txt ./
 RUN uv pip install --system -r requirements.txt
 
+# Copy environment file
+COPY .env ./
+
 # Copy backend code
 COPY backend/ ./
 

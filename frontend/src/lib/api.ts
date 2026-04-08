@@ -28,7 +28,7 @@ export async function updateBoard(board: BoardData): Promise<void> {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ board: JSON.stringify(board) }),
+    body: JSON.stringify({ board }),
   });
   if (!response.ok) {
     throw new Error('Failed to update board');
