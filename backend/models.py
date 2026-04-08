@@ -29,6 +29,20 @@ class Board(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="boards")
+    conversations = relationship("Conversation", back_populates="board")
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    board_id = Column(Integer, ForeignKey("boards.id"), nullable=False)
+    messages = Column(Text, nullable=False)  # JSON array of {role: "user"|"assistant", content: string}
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+    board = relationship("Board", back_populates="conversations")
 
 def get_db():
     db = SessionLocal()

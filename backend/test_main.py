@@ -48,3 +48,37 @@ def test_update_board():
     new_data = get_response.json()
     new_board = json.loads(new_data["board"])
     assert "test-card" in new_board["cards"]
+def test_validate_board_update():
+    """Test board update validation."""
+    from main import validate_board_update
+    
+    current = {
+        "columns": [{"id": "col-1", "title": "Col", "cardIds": []}],
+        "cards": {}
+    }
+    
+    # Valid update - same structure
+    valid_update = {
+        "columns": [{"id": "col-1", "title": "Col", "cardIds": ["card-1"]}],
+        "cards": {"card-1": {"id": "card-1", "title": "Test", "details": "Test"}}
+    }
+    is_valid, msg = validate_board_update(current, valid_update)
+    assert is_valid, msg
+    
+    # Invalid - unknown column ID
+    invalid_update = {
+        "columns": [{"id": "col-unknown", "title": "Col", "cardIds": []}],
+        "cards": {}
+    }
+    is_valid, msg = validate_board_update(current, invalid_update)
+    assert not is_valid
+    assert "Invalid column ID" in msg
+    
+    # Invalid - card referenced but not in cards
+    invalid_update = {
+        "columns": [{"id": "col-1", "title": "Col", "cardIds": ["card-missing"]}],
+        "cards": {}
+    }
+    is_valid, msg = validate_board_update(current, invalid_update)
+    assert not is_valid
+    assert "not in cards" in msg

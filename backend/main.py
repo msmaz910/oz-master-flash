@@ -2,14 +2,39 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
 import os
+import json
 from dotenv import load_dotenv
 
 # Load environment variables first
 load_dotenv()
 
-from models import get_db, init_db, User, Board
+from models import get_db, init_db, User, Board, Conversation
 from ai_service import ai_service
+
+# Pydantic schemas
+class BoardColumn(BaseModel):
+    id: str
+    title: str
+    cardIds: list[str]
+
+class BoardCard(BaseModel):
+    id: str
+    title: str
+    details: str
+
+class BoardData(BaseModel):
+    columns: list[BoardColumn]
+    cards: dict[str, BoardCard]
+
+class AIStructuredResponse(BaseModel):
+    response: str
+    kanbanUpdate: Optional[BoardData] = None
+
+class ChatRequest(BaseModel):
+    question: str
 
 app = FastAPI()
 
@@ -66,7 +91,101 @@ async def update_board(board_data: dict, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Board updated"}
 
-# Mount static files at root if directory exists
+def validate_board_update(current_board: dict, updated_board: dict) -> tuple[bool, str]:
+    """Validate that kanban update has all valid column IDs and structure.
+    
+    Returns: (is_valid, error_message)
+    """
+    try:
+        # Check structure
+        if "columns" not in updated_board or "cards" not in updated_board:
+            return False, "Board must have 'columns' and 'cards' properties"
+        
+        # Get current column IDs
+        current_col_ids = {col["id"] for col in current_board["columns"]}
+        
+        # Check all columns exist
+        for col in updated_board["columns"]:
+            if col["id"] not in current_col_ids:
+                return False, f"Invalid column ID: {col['id']}"
+        
+        # Check all card references in cardIds exist in cards
+        all_card_ids = set(updated_board["cards"].keys())
+        for col in updated_board["columns"]:
+            for card_id in col.get("cardIds", []):
+                if card_id not in all_card_ids:
+                    return False, f"Card ID {card_id} referenced in column but not in cards"
+        
+        return True, ""
+    except Exception as e:
+        return False, f"Validation error: {str(e)}"
+
+@app.post("/api/ai/chat")
+async def chat_with_ai(request: ChatRequest, db: Session = Depends(get_db)):
+    """Chat with AI about the kanban board."""
+    try:
+        # Get user and board
+        user = db.query(User).filter(User.username == "user").first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        board = db.query(Board).filter(Board.user_id == user.id).first()
+        if not board:
+            raise HTTPException(status_code=404, detail="Board not found")
+
+        # Parse current board state
+        board_state = json.loads(board.data)
+
+        # Get or create conversation
+        conversation = db.query(Conversation).filter(
+            Conversation.user_id == user.id,
+            Conversation.board_id == board.id
+        ).first()
+
+        if not conversation:
+            conversation = Conversation(
+                user_id=user.id,
+                board_id=board.id,
+                messages=json.dumps([])
+            )
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+
+        # Parse conversation history
+        history = json.loads(conversation.messages)
+
+        # Call AI service
+        ai_response = await ai_service.chat_with_kanban(
+            request.question,
+            board_state,
+            history
+        )
+
+        # Process kanban update if present
+        if "kanbanUpdate" in ai_response and ai_response["kanbanUpdate"]:
+            is_valid, error_msg = validate_board_update(board_state, ai_response["kanbanUpdate"])
+            if not is_valid:
+                raise HTTPException(status_code=400, detail=f"Invalid board update: {error_msg}")
+            
+            # Apply the update
+            board.data = json.dumps(ai_response["kanbanUpdate"])
+            db.commit()
+
+        # Update conversation history
+        history.append({"role": "user", "content": request.question})
+        history.append({"role": "assistant", "content": ai_response.get("response", "")})
+        conversation.messages = json.dumps(history)
+        db.commit()
+
+        return {
+            "response": ai_response.get("response", ""),
+            "boardUpdated": "kanbanUpdate" in ai_response and ai_response["kanbanUpdate"] is not None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 if os.path.exists("static"):
     app.mount("/", StaticFiles(directory="static", html=True), name="static")
 else:
