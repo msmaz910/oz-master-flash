@@ -92,24 +92,24 @@
 **Success Criteria:** AI test endpoint works; returns correct response from openai/gpt-oss-120b:free; no API key errors.
 
 ## Part 9: AI Kanban Integration
-- [ ] Extend AI service to accept kanban JSON + user question + history
-- [ ] Define Structured Output schema: { response: string, kanbanUpdate?: BoardData }
-- [ ] Create API endpoint: POST /api/ai/chat
-- [ ] Implement conversation history storage
-- [ ] Parse AI response and apply kanban updates if present
-- [ ] Add backend validation for updates
+- [x] Extend AI service to accept kanban JSON + user question + history
+- [x] Define Structured Output schema: { response: string, kanbanUpdate?: BoardData }
+- [x] Create API endpoint: POST /api/ai/chat
+- [x] Implement conversation history storage
+- [x] Parse AI response and apply kanban updates if present
+- [x] Add backend validation for updates
 
 **Tests:** Unit tests for AI parsing; integration tests for full chat flow; mock AI responses.
 
 **Success Criteria:** AI responds to questions; can update kanban via structured output; history maintained; invalid updates rejected.
 
 ## Part 10: AI Chat UI
-- [ ] Create ChatSidebar component with message history
-- [ ] Add chat input and send functionality
-- [ ] Integrate with /api/ai/chat endpoint
-- [ ] Auto-refresh kanban when AI updates it
-- [ ] Style sidebar to match design system
-- [ ] Add toggle to show/hide sidebar
+- [x] Create ChatSidebar component with message history
+- [x] Add chat input and send functionality
+- [x] Integrate with /api/ai/chat endpoint
+- [x] Auto-refresh kanban when AI updates it
+- [x] Style sidebar to match design system
+- [x] Add toggle to show/hide sidebar
 
 **Tests:** Unit tests for chat component; e2e tests for full chat interaction.
 

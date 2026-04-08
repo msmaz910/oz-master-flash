@@ -13,6 +13,11 @@ export interface BoardData {
   }>;
 }
 
+export interface ChatResponse {
+  response: string;
+  boardUpdated: boolean;
+}
+
 export async function fetchBoard(): Promise<BoardData> {
   const response = await fetch('/api/board');
   if (!response.ok) {
@@ -33,4 +38,21 @@ export async function updateBoard(board: BoardData): Promise<void> {
   if (!response.ok) {
     throw new Error('Failed to update board');
   }
+}
+
+export async function sendChatMessage(question: string): Promise<ChatResponse> {
+  const response = await fetch('/api/ai/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ question }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.detail || 'Failed to send chat message');
+  }
+
+  return response.json();
 }

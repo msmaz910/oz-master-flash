@@ -82,3 +82,22 @@ def test_validate_board_update():
     is_valid, msg = validate_board_update(current, invalid_update)
     assert not is_valid
     assert "not in cards" in msg
+
+    # Invalid - same card appears in multiple columns
+    current_multi = {
+        "columns": [
+            {"id": "col-1", "title": "Col 1", "cardIds": []},
+            {"id": "col-2", "title": "Col 2", "cardIds": []},
+        ],
+        "cards": {"card-1": {"id": "card-1", "title": "Test", "details": "Test"}},
+    }
+    invalid_update = {
+        "columns": [
+            {"id": "col-1", "title": "Col 1", "cardIds": ["card-1"]},
+            {"id": "col-2", "title": "Col 2", "cardIds": ["card-1"]},
+        ],
+        "cards": {"card-1": {"id": "card-1", "title": "Test", "details": "Test"}},
+    }
+    is_valid, msg = validate_board_update(current_multi, invalid_update)
+    assert not is_valid
+    assert "multiple columns" in msg

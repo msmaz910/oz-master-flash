@@ -111,10 +111,14 @@ def validate_board_update(current_board: dict, updated_board: dict) -> tuple[boo
         
         # Check all card references in cardIds exist in cards
         all_card_ids = set(updated_board["cards"].keys())
+        seen_card_ids = set()
         for col in updated_board["columns"]:
             for card_id in col.get("cardIds", []):
                 if card_id not in all_card_ids:
                     return False, f"Card ID {card_id} referenced in column but not in cards"
+                if card_id in seen_card_ids:
+                    return False, f"Card ID {card_id} appears in multiple columns"
+                seen_card_ids.add(card_id)
         
         return True, ""
     except Exception as e:

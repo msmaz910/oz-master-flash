@@ -13,6 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
+import { ChatSidebar } from "@/components/ChatSidebar";
 import { createId, initialData, moveCardInBoard, type BoardData } from "@/lib/kanban";
 import { fetchBoard, updateBoard } from "@/lib/api";
 
@@ -21,6 +22,7 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(true);
 
   useEffect(() => {
     const loadBoard = async () => {
@@ -48,6 +50,17 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
     }
   };
 
+  const refreshBoard = async () => {
+    try {
+      const data = await fetchBoard();
+      setBoard(data);
+      setError(null);
+    } catch (err) {
+      setError("Failed to refresh board");
+      console.error(err);
+    }
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -62,7 +75,6 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    console.log('Drag end', active.id, over?.id);
     setActiveCardId(null);
 
     if (!over || active.id === over.id) {
@@ -71,7 +83,6 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
 
     setBoard((prev) => {
       const result = moveCardInBoard(prev, active.id as string, over.id as string);
-      console.log('Move result', result);
       if (result) {
         syncBoard(result);
       }
@@ -192,6 +203,12 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
                 </p>
               </div>
               <button
+                onClick={() => setIsChatOpen((prev) => !prev)}
+                className="rounded-2xl border border-[var(--stroke)] bg-white px-5 py-4 text-xs font-semibold uppercase tracking-[0.35em] text-[var(--secondary-purple)] transition hover:bg-[var(--surface)]"
+              >
+                {isChatOpen ? "Hide AI Chat" : "Show AI Chat"}
+              </button>
+              <button
                 onClick={onLogout}
                 className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4 text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)] transition hover:bg-white hover:text-[var(--navy-dark)]"
               >
@@ -212,32 +229,36 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
           </div>
         </header>
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <section className="grid gap-6 lg:grid-cols-5">
-            {board.columns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                column={column}
-                cards={column.cardIds.map((cardId) => board.cards[cardId])}
-                onRename={handleRenameColumn}
-                onAddCard={handleAddCard}
-                onDeleteCard={handleDeleteCard}
-              />
-            ))}
-          </section>
-          <DragOverlay>
-            {activeCard ? (
-              <div className="w-[260px]">
-                <KanbanCardPreview card={activeCard} />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+        <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <section className="grid gap-6 lg:grid-cols-5">
+              {board.columns.map((column) => (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                  onRename={handleRenameColumn}
+                  onAddCard={handleAddCard}
+                  onDeleteCard={handleDeleteCard}
+                />
+              ))}
+            </section>
+            <DragOverlay>
+              {activeCard ? (
+                <div className="w-[260px]">
+                  <KanbanCardPreview card={activeCard} />
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+
+          {isChatOpen ? <ChatSidebar onBoardUpdated={refreshBoard} /> : null}
+        </div>
       </main>
     </div>
   );

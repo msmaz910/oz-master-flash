@@ -102,62 +102,35 @@ export const moveCard = (
 
   const isOverColumn = isColumnId(columns, overId);
 
-  if (activeColumnId === overColumnId) {
-    if (isOverColumn) {
-      const nextCardIds = activeColumn.cardIds.filter(
-        (cardId) => cardId !== activeId
-      );
-      nextCardIds.push(activeId);
-      return columns.map((column) =>
-        column.id === activeColumnId
-          ? { ...column, cardIds: nextCardIds }
-          : column
-      );
-    }
+  // Normalize first: remove the active card from all columns, then insert once.
+  // This prevents edge cases where stale/AI-updated board data contains duplicates.
+  const normalizedColumns = columns.map((column) => ({
+    ...column,
+    cardIds: column.cardIds.filter((cardId) => cardId !== activeId),
+  }));
 
-    const oldIndex = activeColumn.cardIds.indexOf(activeId);
-    const newIndex = activeColumn.cardIds.indexOf(overId);
+  const targetColumnId = isOverColumn ? overId : overColumnId;
+  const targetColumn = normalizedColumns.find((column) => column.id === targetColumnId);
 
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
-      return columns;
-    }
-
-    const nextCardIds = [...activeColumn.cardIds];
-    nextCardIds.splice(oldIndex, 1);
-    nextCardIds.splice(newIndex, 0, activeId);
-
-    return columns.map((column) =>
-      column.id === activeColumnId
-        ? { ...column, cardIds: nextCardIds }
-        : column
-    );
-  }
-
-  const activeIndex = activeColumn.cardIds.indexOf(activeId);
-  if (activeIndex === -1) {
+  if (!targetColumn) {
     return columns;
   }
 
-  const nextActiveCardIds = [...activeColumn.cardIds];
-  nextActiveCardIds.splice(activeIndex, 1);
+  const insertIndex = isOverColumn
+    ? targetColumn.cardIds.length
+    : (() => {
+        const index = targetColumn.cardIds.indexOf(overId);
+        return index === -1 ? targetColumn.cardIds.length : index;
+      })();
 
-  const nextOverCardIds = [...overColumn.cardIds];
-  if (isOverColumn) {
-    nextOverCardIds.push(activeId);
-  } else {
-    const overIndex = overColumn.cardIds.indexOf(overId);
-    const insertIndex = overIndex === -1 ? nextOverCardIds.length : overIndex;
-    nextOverCardIds.splice(insertIndex, 0, activeId);
-  }
+  return normalizedColumns.map((column) => {
+    if (column.id !== targetColumnId) {
+      return column;
+    }
 
-  return columns.map((column) => {
-    if (column.id === activeColumnId) {
-      return { ...column, cardIds: nextActiveCardIds };
-    }
-    if (column.id === overColumnId) {
-      return { ...column, cardIds: nextOverCardIds };
-    }
-    return column;
+    const nextCardIds = [...column.cardIds];
+    nextCardIds.splice(insertIndex, 0, activeId);
+    return { ...column, cardIds: nextCardIds };
   });
 };
 
