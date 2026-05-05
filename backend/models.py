@@ -63,16 +63,23 @@ def init_db():
             db.commit()
             db.refresh(user)
 
-            # Create default board
+            # Create default board with placeholder cards for testing
             default_data = '''{
   "columns": [
-    {"id": "col-backlog", "title": "Backlog", "cardIds": []},
-    {"id": "col-discovery", "title": "Discovery", "cardIds": []},
-    {"id": "col-progress", "title": "In Progress", "cardIds": []},
-    {"id": "col-review", "title": "Review", "cardIds": []},
-    {"id": "col-done", "title": "Done", "cardIds": []}
+    {"id": "col-backlog", "title": "Backlog", "cardIds": ["card-1", "card-2"]},
+    {"id": "col-discovery", "title": "Discovery", "cardIds": ["card-3"]},
+    {"id": "col-progress", "title": "In Progress", "cardIds": ["card-4"]},
+    {"id": "col-review", "title": "Review", "cardIds": ["card-5"]},
+    {"id": "col-done", "title": "Done", "cardIds": ["card-6"]}
   ],
-  "cards": {}
+  "cards": {
+    "card-1": {"id": "card-1", "title": "Set up project repo", "details": "Initialize repository and configure tooling"},
+    "card-2": {"id": "card-2", "title": "Write project brief", "details": "Define scope, goals, and success criteria"},
+    "card-3": {"id": "card-3", "title": "Design system architecture", "details": "Diagram components and data flow"},
+    "card-4": {"id": "card-4", "title": "Implement login page", "details": "Build auth UI with form validation"},
+    "card-5": {"id": "card-5", "title": "API integration", "details": "Connect frontend to backend endpoints"},
+    "card-6": {"id": "card-6", "title": "Deploy to staging", "details": "Build Docker image and push to staging environment"}
+  }
 }'''
             board = Board(user_id=user.id, data=default_data)
             db.add(board)
