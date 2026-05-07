@@ -101,3 +101,12 @@ def test_validate_board_update():
     is_valid, msg = validate_board_update(current_multi, invalid_update)
     assert not is_valid
     assert "multiple columns" in msg
+
+    # Invalid - AI omits a column (silent deletion must be rejected)
+    silent_delete_update = {
+        "columns": [],  # All columns removed
+        "cards": {}
+    }
+    is_valid, msg = validate_board_update(current, silent_delete_update)
+    assert not is_valid
+    assert "would remove columns" in msg

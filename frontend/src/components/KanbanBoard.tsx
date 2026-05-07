@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -14,14 +14,15 @@ import {
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { ChatSidebar } from "@/components/ChatSidebar";
-import { createId, initialData, moveCardInBoard, type BoardData } from "@/lib/kanban";
+import { createId, initialData, moveCardInBoard, type BoardData, type Card } from "@/lib/kanban";
 import { fetchBoard, updateBoard } from "@/lib/api";
 
 export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(true);
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
         const data = await fetchBoard();
         setBoard(data);
       } catch (err) {
-        setError('Failed to load board');
+        setLoadError('Failed to load board');
         console.error(err);
       } finally {
         setLoading(false);
@@ -42,11 +43,10 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
   const syncBoard = async (newBoard: BoardData) => {
     try {
       await updateBoard(newBoard);
-      setError(null);
+      setSyncError(null);
     } catch (err) {
-      setError('Failed to save changes');
+      setSyncError('Failed to save changes');
       console.error(err);
-      // Could revert state here, but for MVP, just show error
     }
   };
 
@@ -54,9 +54,9 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
     try {
       const data = await fetchBoard();
       setBoard(data);
-      setError(null);
+      setSyncError(null);
     } catch (err) {
-      setError("Failed to refresh board");
+      setSyncError("Failed to refresh board");
       console.error(err);
     }
   };
@@ -66,8 +66,6 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
       activationConstraint: { distance: 6 },
     })
   );
-
-  const cardsById = useMemo(() => board.cards, [board.cards]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
@@ -81,70 +79,65 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
       return;
     }
 
-    setBoard((prev) => {
-      const result = moveCardInBoard(prev, active.id as string, over.id as string);
-      if (result) {
-        syncBoard(result);
-      }
-      return result || prev;
-    });
+    const result = moveCardInBoard(board, active.id as string, over.id as string);
+    if (result) {
+      setBoard(result);
+      syncBoard(result);
+    }
   };
 
   const handleRenameColumn = (columnId: string, title: string) => {
-    setBoard((prev) => {
-      const newBoard = {
-        ...prev,
-        columns: prev.columns.map((column) =>
-          column.id === columnId ? { ...column, title } : column
-        ),
-      };
-      syncBoard(newBoard);
-      return newBoard;
-    });
+    const newBoard = {
+      ...board,
+      columns: board.columns.map((column) =>
+        column.id === columnId ? { ...column, title } : column
+      ),
+    };
+    setBoard(newBoard);
+  };
+
+  const handleRenameColumnBlur = () => {
+    syncBoard(board);
   };
 
   const handleAddCard = (columnId: string, title: string, details: string) => {
     const id = createId("card");
-    setBoard((prev) => {
-      const newBoard = {
-        ...prev,
-        cards: {
-          ...prev.cards,
-          [id]: { id, title, details: details || "No details yet." },
-        },
-        columns: prev.columns.map((column) =>
-          column.id === columnId
-            ? { ...column, cardIds: [...column.cardIds, id] }
-            : column
-        ),
-      };
-      syncBoard(newBoard);
-      return newBoard;
-    });
+    const newBoard = {
+      ...board,
+      cards: {
+        ...board.cards,
+        [id]: { id, title, details: details || "No details yet." },
+      },
+      columns: board.columns.map((column) =>
+        column.id === columnId
+          ? { ...column, cardIds: [...column.cardIds, id] }
+          : column
+      ),
+    };
+    setBoard(newBoard);
+    syncBoard(newBoard);
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
-    setBoard((prev) => {
-      const newBoard = {
-        ...prev,
-        cards: Object.fromEntries(
-          Object.entries(prev.cards).filter(([id]) => id !== cardId)
-        ),
-        columns: prev.columns.map((column) =>
-          column.id === columnId
-            ? {
-                ...column,
-                cardIds: column.cardIds.filter((id) => id !== cardId),
-              }
-            : column
-        ),
-      };
-      syncBoard(newBoard);
-      return newBoard;
-    });
+    const newBoard = {
+      ...board,
+      cards: Object.fromEntries(
+        Object.entries(board.cards).filter(([id]) => id !== cardId)
+      ),
+      columns: board.columns.map((column) =>
+        column.id === columnId
+          ? {
+              ...column,
+              cardIds: column.cardIds.filter((id) => id !== cardId),
+            }
+          : column
+      ),
+    };
+    setBoard(newBoard);
+    syncBoard(newBoard);
   };
 
-  const activeCard = activeCardId ? cardsById[activeCardId] : null;
+  const activeCard = activeCardId ? board.cards[activeCardId] : null;
 
   if (loading) {
     return (
@@ -157,11 +150,11 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
     );
   }
 
-  if (error) {
+  if (loadError) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-red-600 mb-4">{loadError}</p>
           <button
             onClick={() => window.location.reload()}
             className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4 text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)] transition hover:bg-white hover:text-[var(--navy-dark)]"
@@ -179,6 +172,11 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
       <div className="pointer-events-none absolute bottom-0 right-0 h-[520px] w-[520px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,_rgba(117,57,145,0.18)_0%,_rgba(117,57,145,0.05)_55%,_transparent_75%)]" />
 
       <main className="relative mx-auto flex min-h-screen max-w-[1500px] flex-col gap-10 px-6 pb-16 pt-12">
+        {syncError && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {syncError}
+          </div>
+        )}
         <header className="flex flex-col gap-6 rounded-[32px] border border-[var(--stroke)] bg-white/80 p-8 shadow-[var(--shadow)] backdrop-blur">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div>
@@ -241,8 +239,9 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
                 <KanbanColumn
                   key={column.id}
                   column={column}
-                  cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                  cards={column.cardIds.map((cardId) => board.cards[cardId]).filter(Boolean) as Card[]}
                   onRename={handleRenameColumn}
+                  onRenameBlur={handleRenameColumnBlur}
                   onAddCard={handleAddCard}
                   onDeleteCard={handleDeleteCard}
                 />

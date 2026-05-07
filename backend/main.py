@@ -1,9 +1,10 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 import os
 import json
 from dotenv import load_dotenv
@@ -29,6 +30,9 @@ class BoardData(BaseModel):
     columns: list[BoardColumn]
     cards: dict[str, BoardCard]
 
+class BoardUpdateRequest(BaseModel):
+    board: Any
+
 class AIStructuredResponse(BaseModel):
     response: str
     kanbanUpdate: Optional[BoardData] = None
@@ -36,12 +40,12 @@ class AIStructuredResponse(BaseModel):
 class ChatRequest(BaseModel):
     question: str
 
-app = FastAPI()
-
-# Initialize database on startup
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 # API routes first
 @app.get("/api/hello")
@@ -71,7 +75,7 @@ async def get_board(db: Session = Depends(get_db)):
     return {"board": board.data}
 
 @app.put("/api/board")
-async def update_board(board_data: dict, db: Session = Depends(get_db)):
+async def update_board(board_data: BoardUpdateRequest, db: Session = Depends(get_db)):
     # For MVP, update board for default user "user"
     user = db.query(User).filter(User.username == "user").first()
     if not user:
@@ -81,10 +85,8 @@ async def update_board(board_data: dict, db: Session = Depends(get_db)):
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
 
-    # Ensure board data is always stored as JSON string
-    board_content = board_data["board"]
+    board_content = board_data.board
     if isinstance(board_content, dict):
-        import json
         board.data = json.dumps(board_content)
     else:
         board.data = board_content
@@ -93,22 +95,28 @@ async def update_board(board_data: dict, db: Session = Depends(get_db)):
 
 def validate_board_update(current_board: dict, updated_board: dict) -> tuple[bool, str]:
     """Validate that kanban update has all valid column IDs and structure.
-    
+
     Returns: (is_valid, error_message)
     """
     try:
         # Check structure
         if "columns" not in updated_board or "cards" not in updated_board:
             return False, "Board must have 'columns' and 'cards' properties"
-        
+
         # Get current column IDs
         current_col_ids = {col["id"] for col in current_board["columns"]}
-        
-        # Check all columns exist
+
+        # Check no unknown column IDs (AI can't invent new columns)
         for col in updated_board["columns"]:
             if col["id"] not in current_col_ids:
                 return False, f"Invalid column ID: {col['id']}"
-        
+
+        # Check no columns are silently deleted
+        updated_col_ids = {col["id"] for col in updated_board["columns"]}
+        missing_cols = current_col_ids - updated_col_ids
+        if missing_cols:
+            return False, f"Board update would remove columns: {missing_cols}"
+
         # Check all card references in cardIds exist in cards
         all_card_ids = set(updated_board["cards"].keys())
         seen_card_ids = set()
@@ -119,7 +127,7 @@ def validate_board_update(current_board: dict, updated_board: dict) -> tuple[boo
                 if card_id in seen_card_ids:
                     return False, f"Card ID {card_id} appears in multiple columns"
                 seen_card_ids.add(card_id)
-        
+
         return True, ""
     except Exception as e:
         return False, f"Validation error: {str(e)}"
@@ -156,8 +164,10 @@ async def chat_with_ai(request: ChatRequest, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(conversation)
 
-        # Parse conversation history
+        # Parse conversation history and cap at 20 messages
         history = json.loads(conversation.messages)
+        if len(history) > 20:
+            history = history[-20:]
 
         # Call AI service
         ai_response = await ai_service.chat_with_kanban(
@@ -171,14 +181,16 @@ async def chat_with_ai(request: ChatRequest, db: Session = Depends(get_db)):
             is_valid, error_msg = validate_board_update(board_state, ai_response["kanbanUpdate"])
             if not is_valid:
                 raise HTTPException(status_code=400, detail=f"Invalid board update: {error_msg}")
-            
+
             # Apply the update
             board.data = json.dumps(ai_response["kanbanUpdate"])
             db.commit()
 
-        # Update conversation history
+        # Update conversation history (cap stored history at 20 messages)
         history.append({"role": "user", "content": request.question})
         history.append({"role": "assistant", "content": ai_response.get("response", "")})
+        if len(history) > 20:
+            history = history[-20:]
         conversation.messages = json.dumps(history)
         db.commit()
 
@@ -190,6 +202,7 @@ async def chat_with_ai(request: ChatRequest, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 if os.path.exists("static"):
     app.mount("/", StaticFiles(directory="static", html=True), name="static")
 else:

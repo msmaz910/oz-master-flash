@@ -13,9 +13,6 @@ WORKDIR /app
 COPY backend/requirements.txt ./
 RUN uv pip install --system -r requirements.txt
 
-# Copy environment file
-COPY .env ./
-
 # Copy backend code
 COPY backend/ ./
 
@@ -30,6 +27,10 @@ RUN mkdir -p ../static && cp -r out/* ../static/
 
 # Back to root
 WORKDIR /app
+
+# Persistent data directory (mount with: docker run -v $(pwd)/data:/app/data ...)
+RUN mkdir -p /app/data
+ENV DATABASE_URL=sqlite:////app/data/kanban.db
 
 # Expose port
 EXPOSE 8000
