@@ -61,6 +61,28 @@ test("adds a card to a column", async ({ page }) => {
   await expect(firstColumn.getByText(uniqueTitle)).toBeVisible();
 });
 
+test("adds a comment to a card", async ({ page }) => {
+  await login(page);
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+  const cardTitle = `Comment Card ${Date.now()}`;
+  await firstColumn.getByRole("button", { name: /add a card/i }).click();
+  await firstColumn.getByPlaceholder("Card title").fill(cardTitle);
+  await firstColumn.getByRole("button", { name: /add card/i }).click();
+  await expect(firstColumn.getByText(cardTitle)).toBeVisible();
+
+  // exact: true because the draggable card <article> itself has role="button"
+  // (set by dnd-kit) whose aggregated accessible name also contains this label.
+  await firstColumn
+    .getByRole("button", { name: `Toggle comments on ${cardTitle}`, exact: true })
+    .click();
+  const commentText = `Looks good to me ${Date.now()}`;
+  await firstColumn.getByPlaceholder("Write a comment...").fill(commentText);
+  await firstColumn.getByRole("button", { name: "Post comment", exact: true }).click();
+
+  await expect(firstColumn.getByText(commentText)).toBeVisible();
+  await expect(firstColumn.getByText("user", { exact: true })).toBeVisible();
+});
+
 test("moves a card between columns", async ({ page }) => {
   await login(page);
   // First add a card to drag

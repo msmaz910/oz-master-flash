@@ -106,6 +106,12 @@ export const FlagIcon = (props: IconProps) => (
   </svg>
 );
 
+export const MessageIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <path d="M4 5h16v11H8l-4 4z" />
+  </svg>
+);
+
 export const PanelIcon = (props: IconProps) => (
   <svg {...base} {...props}>
     <rect x="3" y="4" width="18" height="16" rx="2.5" />

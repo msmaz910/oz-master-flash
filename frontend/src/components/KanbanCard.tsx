@@ -9,7 +9,16 @@ import {
   type Card,
   type Priority,
 } from "@/lib/kanban";
-import { CalendarIcon, CheckIcon, CloseIcon, EditIcon, FlagIcon, TrashIcon } from "@/components/icons";
+import {
+  CalendarIcon,
+  CheckIcon,
+  CloseIcon,
+  EditIcon,
+  FlagIcon,
+  MessageIcon,
+  TrashIcon,
+} from "@/components/icons";
+import { CardComments } from "@/components/CardComments";
 
 const PRIORITY_STYLES: Record<Priority, string> = {
   low: "bg-slate-100 text-slate-600",
@@ -18,7 +27,7 @@ const PRIORITY_STYLES: Record<Priority, string> = {
 };
 
 export const CardMeta = ({ card }: { card: Card }) => {
-  if (!card.dueDate && !card.priority) return null;
+  if (!card.dueDate && !card.priority && !card.comments?.length) return null;
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -46,6 +55,12 @@ export const CardMeta = ({ card }: { card: Card }) => {
           {card.dueDate}
         </span>
       )}
+      {card.comments && card.comments.length > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--gray-text)]">
+          <MessageIcon className="h-3 w-3" />
+          {card.comments.length}
+        </span>
+      )}
     </div>
   );
 };
@@ -55,13 +70,15 @@ type KanbanCardProps = {
   accent: string;
   onDelete: (cardId: string) => void;
   onEdit: (cardId: string, title: string, details: string, dueDate?: string, priority?: Priority) => void;
+  onAddComment: (cardId: string, text: string) => void;
 };
 
-export const KanbanCard = ({ card, accent, onDelete, onEdit }: KanbanCardProps) => {
+export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: KanbanCardProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id, disabled: false });
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [formState, setFormState] = useState({
     title: card.title,
     details: card.details,
@@ -235,6 +252,21 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit }: KanbanCardProps) 
           <button
             type="button"
             onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => setIsCommentsOpen((prev) => !prev)}
+            className={clsx(
+              "grid h-7 w-7 shrink-0 place-items-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-blue)]/40",
+              isCommentsOpen
+                ? "bg-[var(--surface)] text-[var(--navy-dark)]"
+                : "text-[var(--gray-text)] hover:bg-[var(--surface)] hover:text-[var(--navy-dark)]"
+            )}
+            title={`Comments on ${card.title}`}
+            aria-label={`Toggle comments on ${card.title}`}
+          >
+            <MessageIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={() => onDelete(card.id)}
             className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[var(--gray-text)] transition hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
             title={`Delete ${card.title}`}
@@ -244,6 +276,12 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit }: KanbanCardProps) 
           </button>
         </div>
       </div>
+      {isCommentsOpen && (
+        <CardComments
+          comments={card.comments ?? []}
+          onAdd={(text) => onAddComment(card.id, text)}
+        />
+      )}
     </article>
   );
 };

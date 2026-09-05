@@ -8,12 +8,20 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
   high: "High",
 };
 
+export type Comment = {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: string;
+};
+
 export type Card = {
   id: string;
   title: string;
   details: string;
   dueDate?: string;
   priority?: Priority;
+  comments?: Comment[];
 };
 
 export const isOverdue = (dueDate: string | undefined, today: Date = new Date()): boolean => {

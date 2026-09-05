@@ -103,6 +103,32 @@ describe("KanbanBoard", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("adds a comment to a card as the current user", async () => {
+    render(<KanbanBoard username="alice" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+    const column = getFirstColumn();
+    await userEvent.click(within(column).getByRole("button", { name: /add a card/i }));
+    await userEvent.type(within(column).getByPlaceholderText(/card title/i), "Discuss scope");
+    await userEvent.click(within(column).getByRole("button", { name: /add card/i }));
+
+    await userEvent.click(
+      within(column).getByRole("button", { name: /toggle comments on discuss scope/i })
+    );
+    await userEvent.type(
+      within(column).getByPlaceholderText(/write a comment/i),
+      "Let's clarify requirements first"
+    );
+    await userEvent.click(within(column).getByRole("button", { name: /post comment/i }));
+
+    expect(within(column).getByText("Let's clarify requirements first")).toBeInTheDocument();
+    expect(within(column).getByText("alice")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(updateBoard).toHaveBeenCalled();
+    });
+  });
+
   it("renames a column", async () => {
     render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {

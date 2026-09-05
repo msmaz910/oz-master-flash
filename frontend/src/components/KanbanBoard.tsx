@@ -305,6 +305,28 @@ export const KanbanBoard = ({
     syncBoard(newBoard);
   };
 
+  const handleAddComment = (cardId: string, text: string) => {
+    const existingCard = board.cards[cardId];
+    const comment = {
+      id: createId("comment"),
+      author: username ?? "Unknown",
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    const newBoard = {
+      ...board,
+      cards: {
+        ...board.cards,
+        [cardId]: {
+          ...existingCard,
+          comments: [...(existingCard.comments ?? []), comment],
+        },
+      },
+    };
+    setBoard(newBoard);
+    syncBoard(newBoard);
+  };
+
   const activeCard = activeCardId ? board.cards[activeCardId] : null;
   const activeCardAccent = useMemo(() => {
     if (!activeCardId) return undefined;
@@ -462,6 +484,7 @@ export const KanbanBoard = ({
                   onDeleteCard={handleDeleteCard}
                   onEditCard={handleEditCard}
                   onDeleteColumn={handleDeleteColumn}
+                  onAddComment={handleAddComment}
                 />
               ))}
               <AddColumnForm onAdd={handleAddColumn} />
