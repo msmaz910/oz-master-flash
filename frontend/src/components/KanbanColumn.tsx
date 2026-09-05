@@ -4,27 +4,32 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import type { Card, Column, Priority } from "@/lib/kanban";
 import { KanbanCard } from "@/components/KanbanCard";
 import { NewCardForm } from "@/components/NewCardForm";
+import { TrashIcon } from "@/components/icons";
 
 type KanbanColumnProps = {
   column: Column;
   cards: Card[];
   accent: string;
+  canDelete: boolean;
   onRename: (columnId: string, title: string) => void;
   onRenameBlur: (columnId: string) => void;
   onAddCard: (columnId: string, title: string, details: string, dueDate?: string, priority?: Priority) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
   onEditCard: (cardId: string, title: string, details: string, dueDate?: string, priority?: Priority) => void;
+  onDeleteColumn: (columnId: string) => void;
 };
 
 export const KanbanColumn = ({
   column,
   cards,
   accent,
+  canDelete,
   onRename,
   onRenameBlur,
   onAddCard,
   onDeleteCard,
   onEditCard,
+  onDeleteColumn,
 }: KanbanColumnProps) => {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
@@ -60,6 +65,17 @@ export const KanbanColumn = ({
           <span className="shrink-0 rounded-full bg-[var(--surface)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--gray-text)]">
             {cards.length}
           </span>
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => onDeleteColumn(column.id)}
+              title={`Delete ${column.title || "column"}`}
+              aria-label={`Delete ${column.title || "column"} column`}
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-lg text-[var(--gray-text)] transition hover:bg-red-50 hover:text-red-500"
+            >
+              <TrashIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

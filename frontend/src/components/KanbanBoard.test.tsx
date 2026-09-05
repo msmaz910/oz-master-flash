@@ -49,6 +49,60 @@ describe("KanbanBoard", () => {
     });
   });
 
+  it("adds a new column", async () => {
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /add column/i }));
+    await userEvent.type(screen.getByPlaceholderText(/column name/i), "Blocked");
+    await userEvent.click(screen.getByRole("button", { name: /^add column$/i }));
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(6);
+    });
+    expect(screen.getByDisplayValue("Blocked")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(updateBoard).toHaveBeenCalled();
+    });
+  });
+
+  it("deletes an empty column but not a column with cards", async () => {
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+
+    const firstColumn = getFirstColumn();
+    // Empty column: delete control is present
+    const deleteColumnButton = within(firstColumn).getByRole("button", {
+      name: /delete to do column/i,
+    });
+    await userEvent.click(deleteColumnButton);
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(4);
+    });
+    expect(screen.queryByDisplayValue("To Do")).not.toBeInTheDocument();
+  });
+
+  it("does not offer to delete a column that still has cards", async () => {
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+
+    const firstColumn = getFirstColumn();
+    await userEvent.click(within(firstColumn).getByRole("button", { name: /add a card/i }));
+    await userEvent.type(within(firstColumn).getByPlaceholderText(/card title/i), "Blocking card");
+    await userEvent.click(within(firstColumn).getByRole("button", { name: /add card/i }));
+
+    expect(
+      within(firstColumn).queryByRole("button", { name: /delete to do column/i })
+    ).not.toBeInTheDocument();
+  });
+
   it("renames a column", async () => {
     render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {

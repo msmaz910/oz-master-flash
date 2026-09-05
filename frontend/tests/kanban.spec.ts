@@ -81,6 +81,47 @@ test("moves a card between columns", async ({ page }) => {
   }
 });
 
+test("adds a column, moves a card with due date/priority, then deletes the empty column", async ({ page }) => {
+  await login(page);
+
+  const columnName = `Blocked ${Date.now()}`;
+  await page.getByRole("button", { name: /add column/i }).click();
+  await page.getByPlaceholder("Column name").fill(columnName);
+  await page.getByRole("button", { name: "Add column" }).click();
+
+  // New columns are appended to the end, so the last column is the one just created.
+  const newColumn = page.locator('[data-testid^="column-"]').last();
+  await expect(newColumn.getByLabel("Column title")).toHaveValue(columnName);
+
+  // Add a card with a due date and priority directly in the new column
+  await newColumn.getByRole("button", { name: /add a card/i }).click();
+  const cardTitle = `Escalation ${Date.now()}`;
+  await newColumn.getByPlaceholder("Card title").fill(cardTitle);
+  await newColumn.getByLabel("Due date").fill("2099-03-01");
+  await newColumn.getByLabel("Priority").selectOption("high");
+  await newColumn.getByRole("button", { name: /add card/i }).click();
+
+  await expect(newColumn.getByText(cardTitle)).toBeVisible();
+  await expect(newColumn.getByText("High")).toBeVisible();
+  await expect(newColumn.getByText("2099-03-01")).toBeVisible();
+
+  // Column with a card in it can't be deleted
+  await expect(
+    newColumn.getByRole("button", { name: `Delete ${columnName} column`, exact: true })
+  ).toHaveCount(0);
+
+  // Delete the card, then the now-empty column.
+  // exact: true because the draggable card <article> itself has role="button"
+  // (set by dnd-kit) whose aggregated accessible name also contains the
+  // delete button's label as a substring.
+  await newColumn.getByRole("button", { name: `Delete ${cardTitle}`, exact: true }).click();
+  const columnCountBeforeDelete = await page.locator('[data-testid^="column-"]').count();
+  await newColumn
+    .getByRole("button", { name: `Delete ${columnName} column`, exact: true })
+    .click();
+  await expect(page.locator('[data-testid^="column-"]')).toHaveCount(columnCountBeforeDelete - 1);
+});
+
 test("creates, switches between, and deletes boards", async ({ page }) => {
   await login(page);
 

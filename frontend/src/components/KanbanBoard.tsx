@@ -16,6 +16,7 @@ import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { BoardSwitcher } from "@/components/BoardSwitcher";
+import { AddColumnForm } from "@/components/AddColumnForm";
 import {
   BoardIcon,
   LogoutIcon,
@@ -221,6 +222,26 @@ export const KanbanBoard = ({
 
   const handleRenameColumnBlur = () => {
     syncBoard(board);
+  };
+
+  const handleAddColumn = (title: string) => {
+    const newColumn = { id: createId("col"), title, cardIds: [] };
+    const newBoard = { ...board, columns: [...board.columns, newColumn] };
+    setBoard(newBoard);
+    syncBoard(newBoard);
+  };
+
+  const handleDeleteColumn = (columnId: string) => {
+    const column = board.columns.find((c) => c.id === columnId);
+    if (!column || column.cardIds.length > 0 || board.columns.length <= 1) {
+      return;
+    }
+    const newBoard = {
+      ...board,
+      columns: board.columns.filter((c) => c.id !== columnId),
+    };
+    setBoard(newBoard);
+    syncBoard(newBoard);
   };
 
   const handleAddCard = (
@@ -434,13 +455,16 @@ export const KanbanBoard = ({
                   column={column}
                   accent={accentFor(index)}
                   cards={column.cardIds.map((cardId) => board.cards[cardId]).filter(Boolean) as Card[]}
+                  canDelete={column.cardIds.length === 0 && board.columns.length > 1}
                   onRename={handleRenameColumn}
                   onRenameBlur={handleRenameColumnBlur}
                   onAddCard={handleAddCard}
                   onDeleteCard={handleDeleteCard}
                   onEditCard={handleEditCard}
+                  onDeleteColumn={handleDeleteColumn}
                 />
               ))}
+              <AddColumnForm onAdd={handleAddColumn} />
             </section>
           </main>
           <DragOverlay dropAnimation={null}>
