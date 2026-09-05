@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from "react";
+import { PlusIcon, CheckIcon, CloseIcon } from "@/components/icons";
 
 const initialFormState = { title: "", details: "" };
 
 type NewCardFormProps = {
+  accent: string;
   onAdd: (title: string, details: string) => void;
 };
 
-export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
+export const NewCardForm = ({ accent, onAdd }: NewCardFormProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [formState, setFormState] = useState(initialFormState);
 
@@ -20,56 +22,65 @@ export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
     setIsOpen(false);
   };
 
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--stroke-strong)] px-3 py-2.5 text-xs font-semibold text-[var(--gray-text)] transition hover:border-[var(--primary-blue)] hover:bg-white hover:text-[var(--primary-blue)]"
+      >
+        <PlusIcon className="h-4 w-4" />
+        Add a card
+      </button>
+    );
+  }
+
   return (
-    <div className="mt-4">
-      {isOpen ? (
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            value={formState.title}
-            onChange={(event) =>
-              setFormState((prev) => ({ ...prev, title: event.target.value }))
-            }
-            placeholder="Card title"
-            className="w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm font-medium text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
-            required
-          />
-          <textarea
-            value={formState.details}
-            onChange={(event) =>
-              setFormState((prev) => ({ ...prev, details: event.target.value }))
-            }
-            placeholder="Details"
-            rows={3}
-            className="w-full resize-none rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
-          />
-          <div className="flex items-center gap-2">
-            <button
-              type="submit"
-              className="rounded-full bg-[var(--secondary-purple)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:brightness-110"
-            >
-              Add card
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                setFormState(initialFormState);
-              }}
-              className="rounded-full border border-[var(--stroke)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--gray-text)] transition hover:text-[var(--navy-dark)]"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      ) : (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-2 rounded-2xl border border-[var(--stroke)] bg-white p-2.5 shadow-[0_10px_24px_rgba(3,33,71,0.08)]"
+    >
+      <input
+        value={formState.title}
+        onChange={(event) =>
+          setFormState((prev) => ({ ...prev, title: event.target.value }))
+        }
+        placeholder="Card title"
+        autoFocus
+        className="w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-sm font-medium text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
+        required
+      />
+      <textarea
+        value={formState.details}
+        onChange={(event) =>
+          setFormState((prev) => ({ ...prev, details: event.target.value }))
+        }
+        placeholder="Details"
+        rows={2}
+        className="w-full resize-none rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          style={{ backgroundColor: accent }}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110"
+        >
+          <CheckIcon className="h-4 w-4" />
+          Add card
+        </button>
         <button
           type="button"
-          onClick={() => setIsOpen(true)}
-          className="w-full rounded-full border border-dashed border-[var(--stroke)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--primary-blue)] transition hover:border-[var(--primary-blue)]"
+          onClick={() => {
+            setIsOpen(false);
+            setFormState(initialFormState);
+          }}
+          title="Cancel"
+          aria-label="Cancel"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-[var(--stroke)] text-[var(--gray-text)] transition hover:bg-[var(--surface)] hover:text-[var(--navy-dark)]"
         >
-          Add a card
+          <CloseIcon className="h-4 w-4" />
         </button>
-      )}
-    </div>
+      </div>
+    </form>
   );
 };
