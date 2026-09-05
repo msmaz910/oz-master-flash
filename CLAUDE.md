@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Project Management MVP web app: a Kanban board with an AI chat assistant that can propose board updates. Single-user, Docker-first deployment.
+A Project Management web app: multi-user accounts, each with multiple Kanban boards, plus an AI chat assistant that can propose board updates. Docker-first deployment.
 
 **Stack**: Next.js 16 (React 19, TypeScript, Tailwind 4) + FastAPI (Python, SQLAlchemy, SQLite) + OpenRouter LLM
 
@@ -45,7 +45,8 @@ The Dockerfile builds the Next.js app as a static export (`out/`), copies it int
 - `frontend/src/lib/` — `kanban.ts` (board logic), `api.ts` (fetch wrappers)
 - `frontend/tests/` — Playwright e2e tests
 - `backend/main.py` — all FastAPI routes
-- `backend/models.py` — SQLAlchemy ORM: User → Board (JSON) → Conversation
+- `backend/models.py` — SQLAlchemy ORM: User (1:N) → Board (JSON) → Conversation; also `UserSession` (bearer tokens)
+- `backend/security.py` — password hashing (PBKDF2-HMAC-SHA256, stdlib only) and session token generation
 - `backend/ai_service.py` — OpenRouter client and prompt logic
 
 ### Data flow quirk: double-serialized board
@@ -56,13 +57,13 @@ const board = JSON.parse(JSON.parse(data.board));
 When saving, send `{ board: JSON.stringify(boardObject) }` or `{ board: boardObject }` — the endpoint accepts both.
 
 ### AI integration
-`/api/ai/chat` passes the current board state + conversation history to the LLM. The LLM responds with structured JSON: `{ "response": "...", "kanbanUpdate": {...} }`. The server validates `kanbanUpdate` via `validate_board_update()` before persisting. If JSON parsing fails, the raw text is returned as a plain chat message.
+`/api/ai/chat` takes a `boardId` plus the user's question, and passes that board's state + conversation history to the LLM. The LLM responds with structured JSON: `{ "response": "...", "kanbanUpdate": {...} }`. The server validates `kanbanUpdate` via `validate_board_update()` before persisting. If JSON parsing fails, the raw text is returned as a plain chat message.
 
 ### Auth
-Login credentials are hardcoded (`user` / `password`). Auth state is stored in `localStorage` only — there is no server-side session. This is intentional for MVP scope.
+Real multi-user auth: `POST /api/auth/register` and `POST /api/auth/login` return a bearer token backed by a `sessions` row; `GET /api/auth/me` and every board/chat endpoint resolve the acting user from `Authorization: Bearer <token>` via the `get_current_user` FastAPI dependency in `main.py`. The frontend stores the token in `localStorage` (`frontend/src/lib/api.ts`) and attaches it to every request. A demo account (`user` / `password`) is still seeded on startup for convenience.
 
 ### Database init
-On startup, `init_db()` creates tables, the default user, and a default board with 5 columns if they don't already exist. One board per user; no multi-board support.
+On startup, `init_db()` creates tables, runs lightweight `ALTER TABLE` migrations for columns added after the initial schema (`boards.name`, `users.password_hash`), and seeds the demo user + one default board with 5 columns if they don't already exist. Boards are 1:N per user — see `/api/boards*` routes in `main.py` and the `BoardSwitcher` component on the frontend.
 
 ## Environment
 
