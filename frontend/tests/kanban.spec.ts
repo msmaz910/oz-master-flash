@@ -78,6 +78,19 @@ test("filters cards by search text", async ({ page }) => {
   await expect(firstColumn.getByText("Set up project repo")).toBeVisible();
 });
 
+test("logs card activity and shows it in the activity panel", async ({ page }) => {
+  await login(page);
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+  const cardTitle = `Activity Card ${Date.now()}`;
+  await firstColumn.getByRole("button", { name: /add a card/i }).click();
+  await firstColumn.getByPlaceholder("Card title").fill(cardTitle);
+  await firstColumn.getByRole("button", { name: /add card/i }).click();
+  await expect(firstColumn.getByText(cardTitle)).toBeVisible();
+
+  await page.getByRole("button", { name: /show activity/i }).click();
+  await expect(page.getByText(`user added "${cardTitle}"`)).toBeVisible();
+});
+
 test("adds a comment to a card", async ({ page }) => {
   await login(page);
   const firstColumn = page.locator('[data-testid^="column-"]').first();

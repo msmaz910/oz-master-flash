@@ -20,16 +20,19 @@ import { AddColumnForm } from "@/components/AddColumnForm";
 import { FilterBar } from "@/components/FilterBar";
 import {
   BoardIcon,
+  HistoryIcon,
   LogoutIcon,
   PanelIcon,
   RefreshIcon,
   SparkIcon,
 } from "@/components/icons";
+import { ActivityPanel } from "@/components/ActivityPanel";
 import {
   createId,
   initialData,
   moveCardInBoard,
   cardMatchesFilters,
+  appendActivity,
   EMPTY_FILTERS,
   type BoardData,
   type Card,
@@ -81,6 +84,13 @@ export const KanbanBoard = ({
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filters, setFilters] = useState<CardFilters>(EMPTY_FILTERS);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
+
+  const actor = username ?? "Unknown";
+  const logActivity = (b: BoardData, message: string): BoardData => ({
+    ...b,
+    activity: appendActivity(b.activity, message, actor),
+  });
 
   useEffect(() => {
     const init = async () => {
@@ -217,8 +227,19 @@ export const KanbanBoard = ({
 
     const result = moveCardInBoard(board, active.id as string, over.id as string);
     if (result) {
-      setBoard(result);
-      syncBoard(result);
+      const movedCard = board.cards[active.id as string];
+      const sourceColumnId = board.columns.find((column) =>
+        column.cardIds.includes(active.id as string)
+      )?.id;
+      const targetColumn = result.columns.find((column) =>
+        column.cardIds.includes(active.id as string)
+      );
+      const logged =
+        movedCard && targetColumn && targetColumn.id !== sourceColumnId
+          ? logActivity(result, `${actor} moved "${movedCard.title}" to ${targetColumn.title}`)
+          : result;
+      setBoard(logged);
+      syncBoard(logged);
     }
   };
 
@@ -238,7 +259,10 @@ export const KanbanBoard = ({
 
   const handleAddColumn = (title: string) => {
     const newColumn = { id: createId("col"), title, cardIds: [] };
-    const newBoard = { ...board, columns: [...board.columns, newColumn] };
+    const newBoard = logActivity(
+      { ...board, columns: [...board.columns, newColumn] },
+      `${actor} added column "${title}"`
+    );
     setBoard(newBoard);
     syncBoard(newBoard);
   };
@@ -248,10 +272,10 @@ export const KanbanBoard = ({
     if (!column || column.cardIds.length > 0 || board.columns.length <= 1) {
       return;
     }
-    const newBoard = {
-      ...board,
-      columns: board.columns.filter((c) => c.id !== columnId),
-    };
+    const newBoard = logActivity(
+      { ...board, columns: board.columns.filter((c) => c.id !== columnId) },
+      `${actor} deleted column "${column.title}"`
+    );
     setBoard(newBoard);
     syncBoard(newBoard);
   };
@@ -264,37 +288,44 @@ export const KanbanBoard = ({
     priority?: Priority
   ) => {
     const id = createId("card");
-    const newBoard = {
-      ...board,
-      cards: {
-        ...board.cards,
-        [id]: { id, title, details: details || "No details yet.", dueDate, priority },
+    const newBoard = logActivity(
+      {
+        ...board,
+        cards: {
+          ...board.cards,
+          [id]: { id, title, details: details || "No details yet.", dueDate, priority },
+        },
+        columns: board.columns.map((column) =>
+          column.id === columnId
+            ? { ...column, cardIds: [...column.cardIds, id] }
+            : column
+        ),
       },
-      columns: board.columns.map((column) =>
-        column.id === columnId
-          ? { ...column, cardIds: [...column.cardIds, id] }
-          : column
-      ),
-    };
+      `${actor} added "${title}"`
+    );
     setBoard(newBoard);
     syncBoard(newBoard);
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
-    const newBoard = {
-      ...board,
-      cards: Object.fromEntries(
-        Object.entries(board.cards).filter(([id]) => id !== cardId)
-      ),
-      columns: board.columns.map((column) =>
-        column.id === columnId
-          ? {
-              ...column,
-              cardIds: column.cardIds.filter((id) => id !== cardId),
-            }
-          : column
-      ),
-    };
+    const deletedTitle = board.cards[cardId]?.title ?? "a card";
+    const newBoard = logActivity(
+      {
+        ...board,
+        cards: Object.fromEntries(
+          Object.entries(board.cards).filter(([id]) => id !== cardId)
+        ),
+        columns: board.columns.map((column) =>
+          column.id === columnId
+            ? {
+                ...column,
+                cardIds: column.cardIds.filter((id) => id !== cardId),
+              }
+            : column
+        ),
+      },
+      `${actor} deleted "${deletedTitle}"`
+    );
     setBoard(newBoard);
     syncBoard(newBoard);
   };
@@ -306,13 +337,16 @@ export const KanbanBoard = ({
     dueDate?: string,
     priority?: Priority
   ) => {
-    const newBoard = {
-      ...board,
-      cards: {
-        ...board.cards,
-        [cardId]: { ...board.cards[cardId], title, details, dueDate, priority },
+    const newBoard = logActivity(
+      {
+        ...board,
+        cards: {
+          ...board.cards,
+          [cardId]: { ...board.cards[cardId], title, details, dueDate, priority },
+        },
       },
-    };
+      `${actor} edited "${title}"`
+    );
     setBoard(newBoard);
     syncBoard(newBoard);
   };
@@ -321,20 +355,23 @@ export const KanbanBoard = ({
     const existingCard = board.cards[cardId];
     const comment = {
       id: createId("comment"),
-      author: username ?? "Unknown",
+      author: actor,
       text,
       createdAt: new Date().toISOString(),
     };
-    const newBoard = {
-      ...board,
-      cards: {
-        ...board.cards,
-        [cardId]: {
-          ...existingCard,
-          comments: [...(existingCard.comments ?? []), comment],
+    const newBoard = logActivity(
+      {
+        ...board,
+        cards: {
+          ...board.cards,
+          [cardId]: {
+            ...existingCard,
+            comments: [...(existingCard.comments ?? []), comment],
+          },
         },
       },
-    };
+      `${actor} commented on "${existingCard.title}"`
+    );
     setBoard(newBoard);
     syncBoard(newBoard);
   };
@@ -452,6 +489,26 @@ export const KanbanBoard = ({
             >
               <SparkIcon className="h-[18px] w-[18px]" />
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setIsActivityOpen((prev) => !prev)}
+                className={clsx(
+                  toolbarButtonBase,
+                  isActivityOpen ? toolbarButtonActive : toolbarButtonIdle
+                )}
+                title={isActivityOpen ? "Hide activity" : "Show activity"}
+                aria-label={isActivityOpen ? "Hide activity" : "Show activity"}
+                aria-pressed={isActivityOpen}
+              >
+                <HistoryIcon className="h-[18px] w-[18px]" />
+              </button>
+              {isActivityOpen && (
+                <ActivityPanel
+                  entries={board.activity ?? []}
+                  onClose={() => setIsActivityOpen(false)}
+                />
+              )}
+            </div>
             <span className="mx-1 h-6 w-px bg-[var(--stroke)]" />
             {username && (
               <span className="hidden text-xs font-semibold text-[var(--gray-text)] sm:inline">

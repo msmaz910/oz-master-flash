@@ -62,9 +62,33 @@ export type Column = {
   cardIds: string[];
 };
 
+export type ActivityEntry = {
+  id: string;
+  message: string;
+  author: string;
+  createdAt: string;
+};
+
+export const MAX_ACTIVITY_ENTRIES = 100;
+
 export type BoardData = {
   columns: Column[];
   cards: Record<string, Card>;
+  activity?: ActivityEntry[];
+};
+
+export const appendActivity = (
+  activity: ActivityEntry[] | undefined,
+  message: string,
+  author: string
+): ActivityEntry[] => {
+  const entry: ActivityEntry = {
+    id: createId("activity"),
+    message,
+    author,
+    createdAt: new Date().toISOString(),
+  };
+  return [entry, ...(activity ?? [])].slice(0, MAX_ACTIVITY_ENTRIES);
 };
 
 export const initialData: BoardData = {

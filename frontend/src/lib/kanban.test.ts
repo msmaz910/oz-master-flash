@@ -5,6 +5,8 @@ import {
   hasActiveFilters,
   EMPTY_FILTERS,
   isOverdue,
+  appendActivity,
+  MAX_ACTIVITY_ENTRIES,
   type BoardData,
   type Column,
   type Card,
@@ -75,6 +77,32 @@ describe("isOverdue", () => {
   it("is false for today or a future date", () => {
     expect(isOverdue("2026-06-15", today)).toBe(false);
     expect(isOverdue("2026-06-16", today)).toBe(false);
+  });
+});
+
+describe("appendActivity", () => {
+  it("prepends a new entry with author, message, and a timestamp", () => {
+    const result = appendActivity(undefined, "did a thing", "alice");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ message: "did a thing", author: "alice" });
+    expect(typeof result[0].id).toBe("string");
+    expect(typeof result[0].createdAt).toBe("string");
+  });
+
+  it("puts the newest entry first", () => {
+    const first = appendActivity(undefined, "first", "alice");
+    const second = appendActivity(first, "second", "alice");
+    expect(second.map((e) => e.message)).toEqual(["second", "first"]);
+  });
+
+  it("caps the log at MAX_ACTIVITY_ENTRIES", () => {
+    let activity = undefined as ReturnType<typeof appendActivity> | undefined;
+    for (let i = 0; i < MAX_ACTIVITY_ENTRIES + 10; i++) {
+      activity = appendActivity(activity, `entry ${i}`, "alice");
+    }
+    expect(activity).toHaveLength(MAX_ACTIVITY_ENTRIES);
+    // Newest entries survive, oldest are dropped
+    expect(activity![0].message).toBe(`entry ${MAX_ACTIVITY_ENTRIES + 9}`);
   });
 });
 

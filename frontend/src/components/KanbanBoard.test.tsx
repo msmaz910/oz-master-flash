@@ -129,6 +129,35 @@ describe("KanbanBoard", () => {
     });
   });
 
+  it("logs activity for card creation, editing, and deletion", async () => {
+    render(<KanbanBoard username="alice" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+    const column = getFirstColumn();
+    await userEvent.click(within(column).getByRole("button", { name: /add a card/i }));
+    await userEvent.type(within(column).getByPlaceholderText(/card title/i), "Ship it");
+    await userEvent.click(within(column).getByRole("button", { name: /add card/i }));
+
+    await userEvent.click(within(column).getByRole("button", { name: "Delete Ship it", exact: true }));
+
+    await userEvent.click(screen.getByRole("button", { name: /show activity/i }));
+
+    expect(screen.getByText('alice added "Ship it"')).toBeInTheDocument();
+    expect(screen.getByText('alice deleted "Ship it"')).toBeInTheDocument();
+  });
+
+  it("shows 'No activity yet.' on a board with no history", async () => {
+    render(<KanbanBoard username="alice" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /show activity/i }));
+
+    expect(screen.getByText("No activity yet.")).toBeInTheDocument();
+  });
+
   it("renames a column", async () => {
     render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {
