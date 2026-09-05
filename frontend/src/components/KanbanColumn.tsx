@@ -9,6 +9,7 @@ import { TrashIcon } from "@/components/icons";
 type KanbanColumnProps = {
   column: Column;
   cards: Card[];
+  totalCardCount: number;
   accent: string;
   canDelete: boolean;
   onRename: (columnId: string, title: string) => void;
@@ -23,6 +24,7 @@ type KanbanColumnProps = {
 export const KanbanColumn = ({
   column,
   cards,
+  totalCardCount,
   accent,
   canDelete,
   onRename,
@@ -65,7 +67,7 @@ export const KanbanColumn = ({
             aria-label="Column title"
           />
           <span className="shrink-0 rounded-full bg-[var(--surface)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--gray-text)]">
-            {cards.length}
+            {cards.length === totalCardCount ? totalCardCount : `${cards.length}/${totalCardCount}`}
           </span>
           {canDelete && (
             <button
@@ -82,7 +84,7 @@ export const KanbanColumn = ({
       </div>
 
       <div className="board-scroll flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-3 py-3">
-        <SortableContext items={column.cardIds} strategy={verticalListSortingStrategy}>
+        <SortableContext items={cards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
             <KanbanCard
               key={card.id}
@@ -103,7 +105,7 @@ export const KanbanColumn = ({
                 : "border-[var(--stroke-strong)] text-[var(--gray-text)]"
             )}
           >
-            Drop a card here
+            {totalCardCount > 0 ? "No cards match your filters" : "Drop a card here"}
           </div>
         )}
       </div>

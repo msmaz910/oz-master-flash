@@ -1,4 +1,82 @@
-import { moveCard, moveCardInBoard, type BoardData, type Column } from "@/lib/kanban";
+import {
+  moveCard,
+  moveCardInBoard,
+  cardMatchesFilters,
+  hasActiveFilters,
+  EMPTY_FILTERS,
+  isOverdue,
+  type BoardData,
+  type Column,
+  type Card,
+} from "@/lib/kanban";
+
+describe("cardMatchesFilters", () => {
+  const card: Card = {
+    id: "card-1",
+    title: "Ship the release",
+    details: "Cut the tag and notify stakeholders",
+    priority: "high",
+    dueDate: "2000-01-01",
+  };
+
+  it("matches everything with empty filters", () => {
+    expect(cardMatchesFilters(card, EMPTY_FILTERS)).toBe(true);
+  });
+
+  it("matches a query against title or details, case-insensitively", () => {
+    expect(cardMatchesFilters(card, { ...EMPTY_FILTERS, query: "SHIP" })).toBe(true);
+    expect(cardMatchesFilters(card, { ...EMPTY_FILTERS, query: "stakeholders" })).toBe(true);
+    expect(cardMatchesFilters(card, { ...EMPTY_FILTERS, query: "nonexistent" })).toBe(false);
+  });
+
+  it("filters by priority", () => {
+    expect(cardMatchesFilters(card, { ...EMPTY_FILTERS, priority: "high" })).toBe(true);
+    expect(cardMatchesFilters(card, { ...EMPTY_FILTERS, priority: "low" })).toBe(false);
+  });
+
+  it("filters by overdue status", () => {
+    expect(cardMatchesFilters(card, { ...EMPTY_FILTERS, overdueOnly: true })).toBe(true);
+    const notOverdue: Card = { ...card, dueDate: "2999-01-01" };
+    expect(cardMatchesFilters(notOverdue, { ...EMPTY_FILTERS, overdueOnly: true })).toBe(false);
+    const noDueDate: Card = { ...card, dueDate: undefined };
+    expect(cardMatchesFilters(noDueDate, { ...EMPTY_FILTERS, overdueOnly: true })).toBe(false);
+  });
+
+  it("requires every active filter to match", () => {
+    const filters = { query: "ship", priority: "high" as const, overdueOnly: true };
+    expect(cardMatchesFilters(card, filters)).toBe(true);
+    expect(cardMatchesFilters({ ...card, priority: "low" }, filters)).toBe(false);
+  });
+});
+
+describe("hasActiveFilters", () => {
+  it("is false for the empty filter state", () => {
+    expect(hasActiveFilters(EMPTY_FILTERS)).toBe(false);
+  });
+
+  it("is true when any single filter is set", () => {
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, query: "x" })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, priority: "low" })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, overdueOnly: true })).toBe(true);
+  });
+});
+
+describe("isOverdue", () => {
+  const today = new Date("2026-06-15T00:00:00.000Z");
+
+  it("is false when there's no due date", () => {
+    expect(isOverdue(undefined, today)).toBe(false);
+  });
+
+  it("is true for a date before today", () => {
+    expect(isOverdue("2026-06-14", today)).toBe(true);
+  });
+
+  it("is false for today or a future date", () => {
+    expect(isOverdue("2026-06-15", today)).toBe(false);
+    expect(isOverdue("2026-06-16", today)).toBe(false);
+  });
+});
 
 describe("moveCard", () => {
   const baseColumns: Column[] = [

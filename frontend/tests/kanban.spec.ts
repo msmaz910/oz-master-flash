@@ -61,6 +61,23 @@ test("adds a card to a column", async ({ page }) => {
   await expect(firstColumn.getByText(uniqueTitle)).toBeVisible();
 });
 
+test("filters cards by search text", async ({ page }) => {
+  await login(page);
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+  const uniqueTitle = `Findable ${Date.now()}`;
+  await firstColumn.getByRole("button", { name: /add a card/i }).click();
+  await firstColumn.getByPlaceholder("Card title").fill(uniqueTitle);
+  await firstColumn.getByRole("button", { name: /add card/i }).click();
+  await expect(firstColumn.getByText(uniqueTitle)).toBeVisible();
+
+  await page.getByLabel("Search cards").fill(uniqueTitle);
+  await expect(firstColumn.getByText(uniqueTitle)).toBeVisible();
+  await expect(firstColumn.getByText("Set up project repo")).not.toBeVisible();
+
+  await page.getByRole("button", { name: /clear filters/i }).click();
+  await expect(firstColumn.getByText("Set up project repo")).toBeVisible();
+});
+
 test("adds a comment to a card", async ({ page }) => {
   await login(page);
   const firstColumn = page.locator('[data-testid^="column-"]').first();

@@ -30,6 +30,32 @@ export const isOverdue = (dueDate: string | undefined, today: Date = new Date())
   return dueDate < todayStr;
 };
 
+export type CardFilters = {
+  query: string;
+  priority: Priority | "all";
+  overdueOnly: boolean;
+};
+
+export const EMPTY_FILTERS: CardFilters = {
+  query: "",
+  priority: "all",
+  overdueOnly: false,
+};
+
+export const hasActiveFilters = (filters: CardFilters): boolean =>
+  filters.query.trim() !== "" || filters.priority !== "all" || filters.overdueOnly;
+
+export const cardMatchesFilters = (card: Card, filters: CardFilters): boolean => {
+  const query = filters.query.trim().toLowerCase();
+  if (query) {
+    const haystack = `${card.title} ${card.details}`.toLowerCase();
+    if (!haystack.includes(query)) return false;
+  }
+  if (filters.priority !== "all" && card.priority !== filters.priority) return false;
+  if (filters.overdueOnly && !isOverdue(card.dueDate)) return false;
+  return true;
+};
+
 export type Column = {
   id: string;
   title: string;

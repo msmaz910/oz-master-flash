@@ -17,6 +17,7 @@ import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { BoardSwitcher } from "@/components/BoardSwitcher";
 import { AddColumnForm } from "@/components/AddColumnForm";
+import { FilterBar } from "@/components/FilterBar";
 import {
   BoardIcon,
   LogoutIcon,
@@ -24,7 +25,17 @@ import {
   RefreshIcon,
   SparkIcon,
 } from "@/components/icons";
-import { createId, initialData, moveCardInBoard, type BoardData, type Card, type Priority } from "@/lib/kanban";
+import {
+  createId,
+  initialData,
+  moveCardInBoard,
+  cardMatchesFilters,
+  EMPTY_FILTERS,
+  type BoardData,
+  type Card,
+  type CardFilters,
+  type Priority,
+} from "@/lib/kanban";
 import {
   listBoards,
   createBoard,
@@ -69,6 +80,7 @@ export const KanbanBoard = ({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [filters, setFilters] = useState<CardFilters>(EMPTY_FILTERS);
 
   useEffect(() => {
     const init = async () => {
@@ -341,6 +353,11 @@ export const KanbanBoard = ({
     [board.columns]
   );
 
+  const visibleCardCount = useMemo(
+    () => Object.values(board.cards).filter((card) => cardMatchesFilters(card, filters)).length,
+    [board.cards, filters]
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -459,6 +476,13 @@ export const KanbanBoard = ({
         </div>
       )}
 
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        visibleCount={visibleCardCount}
+        totalCount={totalCards}
+      />
+
       <div className="relative z-10 flex min-h-0 flex-1">
         <DndContext
           sensors={sensors}
@@ -476,7 +500,13 @@ export const KanbanBoard = ({
                   key={column.id}
                   column={column}
                   accent={accentFor(index)}
-                  cards={column.cardIds.map((cardId) => board.cards[cardId]).filter(Boolean) as Card[]}
+                  cards={
+                    column.cardIds
+                      .map((cardId) => board.cards[cardId])
+                      .filter(Boolean)
+                      .filter((card) => cardMatchesFilters(card, filters)) as Card[]
+                  }
+                  totalCardCount={column.cardIds.length}
                   canDelete={column.cardIds.length === 0 && board.columns.length > 1}
                   onRename={handleRenameColumn}
                   onRenameBlur={handleRenameColumnBlur}
