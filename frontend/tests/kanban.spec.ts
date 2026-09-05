@@ -60,6 +60,36 @@ test("moves a card between columns", async ({ page }) => {
   }
 });
 
+test("creates, switches between, and deletes boards", async ({ page }) => {
+  await login(page);
+
+  const boardName = `E2E Board ${Date.now()}`;
+  await page.getByRole("button", { name: /my board/i }).click();
+  await page.getByRole("button", { name: /new board/i }).click();
+  await page.getByLabel("New board name").fill(boardName);
+  await page.getByRole("button", { name: /create board/i }).click();
+
+  await expect(page.getByRole("button", { name: boardName })).toBeVisible();
+  await expect(page.locator('[data-testid^="column-"]')).toHaveCount(5);
+
+  // New board starts empty
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+  await expect(firstColumn.getByText(/drop a card here/i)).toBeVisible();
+
+  // Switch back to the original board and confirm its cards are intact
+  await page.getByRole("button", { name: boardName }).click();
+  await page.getByRole("option", { name: "My Board" }).click();
+  await expect(page.getByRole("button", { name: "My Board" })).toBeVisible();
+  await expect(
+    page.locator('[data-testid^="column-"]').first().locator('[data-testid^="card-"]')
+  ).not.toHaveCount(0);
+
+  // Clean up the created board
+  await page.getByRole("button", { name: "My Board" }).click();
+  await page.getByRole("button", { name: `Delete ${boardName}` }).click();
+  await expect(page.getByRole("option", { name: boardName })).not.toBeVisible();
+});
+
 test("logout functionality", async ({ page }) => {
   await login(page);
   await page.getByRole("button", { name: /sign out/i }).click();

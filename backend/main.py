@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 # Load environment variables first
 load_dotenv()
 
-from models import get_db, init_db, User, Board, Conversation
+from models import get_db, init_db, empty_board_data, User, Board, Conversation
 from ai_service import ai_service
 
 # Pydantic schemas
@@ -31,7 +31,11 @@ class BoardData(BaseModel):
     cards: dict[str, BoardCard]
 
 class BoardUpdateRequest(BaseModel):
-    board: Any
+    board: Optional[Any] = None
+    name: Optional[str] = None
+
+class BoardCreateRequest(BaseModel):
+    name: Optional[str] = None
 
 class AIStructuredResponse(BaseModel):
     response: str
@@ -39,6 +43,7 @@ class AIStructuredResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+    boardId: int
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -61,37 +66,71 @@ async def test_ai(prompt: str = "What is 2+2?"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/board")
-async def get_board(db: Session = Depends(get_db)):
-    # For MVP, return board for default user "user"
+def get_default_user(db: Session) -> User:
+    # For MVP, all boards belong to the single default user "user"
     user = db.query(User).filter(User.username == "user").first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    return user
 
-    board = db.query(Board).filter(Board.user_id == user.id).first()
+def get_owned_board(db: Session, user: User, board_id: int) -> Board:
+    board = db.query(Board).filter(Board.id == board_id, Board.user_id == user.id).first()
     if not board:
         raise HTTPException(status_code=404, detail="Board not found")
+    return board
 
-    return {"board": board.data}
+@app.get("/api/boards")
+async def list_boards(db: Session = Depends(get_db)):
+    user = get_default_user(db)
+    boards = db.query(Board).filter(Board.user_id == user.id).order_by(Board.created_at).all()
+    return [{"id": board.id, "name": board.name} for board in boards]
 
-@app.put("/api/board")
-async def update_board(board_data: BoardUpdateRequest, db: Session = Depends(get_db)):
-    # For MVP, update board for default user "user"
-    user = db.query(User).filter(User.username == "user").first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    board = db.query(Board).filter(Board.user_id == user.id).first()
-    if not board:
-        raise HTTPException(status_code=404, detail="Board not found")
-
-    board_content = board_data.board
-    if isinstance(board_content, dict):
-        board.data = json.dumps(board_content)
-    else:
-        board.data = board_content
+@app.post("/api/boards", status_code=201)
+async def create_board(request: BoardCreateRequest, db: Session = Depends(get_db)):
+    user = get_default_user(db)
+    name = (request.name or "").strip() or "Untitled Board"
+    board = Board(user_id=user.id, name=name, data=empty_board_data())
+    db.add(board)
     db.commit()
-    return {"message": "Board updated"}
+    db.refresh(board)
+    return {"id": board.id, "name": board.name, "board": board.data}
+
+@app.get("/api/boards/{board_id}")
+async def get_board(board_id: int, db: Session = Depends(get_db)):
+    user = get_default_user(db)
+    board = get_owned_board(db, user, board_id)
+    return {"id": board.id, "name": board.name, "board": board.data}
+
+@app.put("/api/boards/{board_id}")
+async def update_board(board_id: int, request: BoardUpdateRequest, db: Session = Depends(get_db)):
+    user = get_default_user(db)
+    board = get_owned_board(db, user, board_id)
+
+    if request.board is not None:
+        board_content = request.board
+        board.data = json.dumps(board_content) if isinstance(board_content, dict) else board_content
+
+    if request.name is not None:
+        stripped_name = request.name.strip()
+        if not stripped_name:
+            raise HTTPException(status_code=400, detail="Board name cannot be empty")
+        board.name = stripped_name
+
+    db.commit()
+    return {"id": board.id, "name": board.name, "message": "Board updated"}
+
+@app.delete("/api/boards/{board_id}")
+async def delete_board(board_id: int, db: Session = Depends(get_db)):
+    user = get_default_user(db)
+    board = get_owned_board(db, user, board_id)
+
+    remaining_boards = db.query(Board).filter(Board.user_id == user.id).count()
+    if remaining_boards <= 1:
+        raise HTTPException(status_code=400, detail="Cannot delete your only board")
+
+    db.delete(board)
+    db.commit()
+    return {"message": "Board deleted"}
 
 def validate_board_update(current_board: dict, updated_board: dict) -> tuple[bool, str]:
     """Validate that kanban update has all valid column IDs and structure.
@@ -137,13 +176,8 @@ async def chat_with_ai(request: ChatRequest, db: Session = Depends(get_db)):
     """Chat with AI about the kanban board."""
     try:
         # Get user and board
-        user = db.query(User).filter(User.username == "user").first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        board = db.query(Board).filter(Board.user_id == user.id).first()
-        if not board:
-            raise HTTPException(status_code=404, detail="Board not found")
+        user = get_default_user(db)
+        board = get_owned_board(db, user, request.boardId)
 
         # Parse current board state
         board_state = json.loads(board.data)

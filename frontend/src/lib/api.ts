@@ -13,13 +13,46 @@ export interface BoardData {
   }>;
 }
 
+export interface BoardSummary {
+  id: number;
+  name: string;
+}
+
 export interface ChatResponse {
   response: string;
   boardUpdated: boolean;
 }
 
-export async function fetchBoard(): Promise<BoardData> {
-  const response = await fetch('/api/board');
+async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
+  const errorData = await response.json().catch(() => null);
+  return errorData?.detail || fallback;
+}
+
+export async function listBoards(): Promise<BoardSummary[]> {
+  const response = await fetch('/api/boards');
+  if (!response.ok) {
+    throw new Error('Failed to fetch boards');
+  }
+  return response.json();
+}
+
+export async function createBoard(name?: string): Promise<{ id: number; name: string; board: BoardData }> {
+  const response = await fetch('/api/boards', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw new Error(await parseErrorDetail(response, 'Failed to create board'));
+  }
+  const data = await response.json();
+  return { id: data.id, name: data.name, board: JSON.parse(data.board) };
+}
+
+export async function fetchBoard(boardId: number): Promise<BoardData> {
+  const response = await fetch(`/api/boards/${boardId}`);
   if (!response.ok) {
     throw new Error('Failed to fetch board');
   }
@@ -27,8 +60,8 @@ export async function fetchBoard(): Promise<BoardData> {
   return JSON.parse(data.board);
 }
 
-export async function updateBoard(board: BoardData): Promise<void> {
-  const response = await fetch('/api/board', {
+export async function updateBoard(boardId: number, board: BoardData): Promise<void> {
+  const response = await fetch(`/api/boards/${boardId}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -40,18 +73,39 @@ export async function updateBoard(board: BoardData): Promise<void> {
   }
 }
 
-export async function sendChatMessage(question: string): Promise<ChatResponse> {
+export async function renameBoard(boardId: number, name: string): Promise<void> {
+  const response = await fetch(`/api/boards/${boardId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw new Error(await parseErrorDetail(response, 'Failed to rename board'));
+  }
+}
+
+export async function deleteBoard(boardId: number): Promise<void> {
+  const response = await fetch(`/api/boards/${boardId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(await parseErrorDetail(response, 'Failed to delete board'));
+  }
+}
+
+export async function sendChatMessage(boardId: number, question: string): Promise<ChatResponse> {
   const response = await fetch('/api/ai/chat', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, boardId }),
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.detail || 'Failed to send chat message');
+    throw new Error(await parseErrorDetail(response, 'Failed to send chat message'));
   }
 
   return response.json();

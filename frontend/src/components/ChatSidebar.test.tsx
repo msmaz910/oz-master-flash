@@ -21,7 +21,7 @@ describe("ChatSidebar", () => {
       boardUpdated: false,
     });
 
-    render(<ChatSidebar onBoardUpdated={vi.fn()} />);
+    render(<ChatSidebar boardId={1} onBoardUpdated={vi.fn()} />);
 
     await userEvent.type(
       screen.getByPlaceholderText(/ask ai to update your board/i),
@@ -34,6 +34,7 @@ describe("ChatSidebar", () => {
     await waitFor(() => {
       expect(screen.getByText("Sure, I can do that.")).toBeInTheDocument();
     });
+    expect(sendChatMessage).toHaveBeenCalledWith(1, "Move card-1 to done");
   });
 
   it("refreshes board when AI reports update", async () => {
@@ -43,7 +44,7 @@ describe("ChatSidebar", () => {
       boardUpdated: true,
     });
 
-    render(<ChatSidebar onBoardUpdated={onBoardUpdated} />);
+    render(<ChatSidebar boardId={1} onBoardUpdated={onBoardUpdated} />);
 
     await userEvent.type(
       screen.getByPlaceholderText(/ask ai to update your board/i),

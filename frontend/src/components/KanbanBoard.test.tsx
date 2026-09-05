@@ -5,31 +5,41 @@ import { vi } from "vitest";
 
 // Mock the API functions
 vi.mock("@/lib/api", () => ({
+  listBoards: vi.fn(),
+  createBoard: vi.fn(),
   fetchBoard: vi.fn(),
   updateBoard: vi.fn(),
+  renameBoard: vi.fn(),
+  deleteBoard: vi.fn(),
 }));
 
-import { fetchBoard, updateBoard } from "@/lib/api";
+import { listBoards, createBoard, fetchBoard, updateBoard, renameBoard, deleteBoard } from "@/lib/api";
 
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
+
+const DEFAULT_BOARD = {
+  columns: [
+    { id: "col1", title: "To Do", cardIds: [] },
+    { id: "col2", title: "In Progress", cardIds: [] },
+    { id: "col3", title: "Review", cardIds: [] },
+    { id: "col4", title: "Done", cardIds: [] },
+    { id: "col5", title: "Archive", cardIds: [] },
+  ],
+  cards: {},
+};
 
 describe("KanbanBoard", () => {
   const mockOnLogout = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Mock successful fetch
-    (fetchBoard as any).mockResolvedValue({
-      columns: [
-        { id: "col1", title: "To Do", cardIds: [] },
-        { id: "col2", title: "In Progress", cardIds: [] },
-        { id: "col3", title: "Review", cardIds: [] },
-        { id: "col4", title: "Done", cardIds: [] },
-        { id: "col5", title: "Archive", cardIds: [] },
-      ],
-      cards: {},
-    });
+    window.localStorage.clear();
+    (listBoards as any).mockResolvedValue([{ id: 1, name: "My Board" }]);
+    (fetchBoard as any).mockResolvedValue(DEFAULT_BOARD);
     (updateBoard as any).mockResolvedValue(undefined);
+    (createBoard as any).mockResolvedValue({ id: 2, name: "New Board", board: DEFAULT_BOARD });
+    (renameBoard as any).mockResolvedValue(undefined);
+    (deleteBoard as any).mockResolvedValue(undefined);
   });
 
   it("renders five columns after loading", async () => {
@@ -158,6 +168,52 @@ describe("KanbanBoard", () => {
     render(<KanbanBoard onLogout={mockOnLogout} />);
     await waitFor(() => {
       expect(screen.getByText("Failed to load board")).toBeInTheDocument();
+    });
+  });
+
+  it("switches to a newly created board", async () => {
+    render(<KanbanBoard onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getByText("My Board")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /my board/i }));
+    await userEvent.click(screen.getByRole("button", { name: /new board/i }));
+    await userEvent.type(screen.getByLabelText("New board name"), "Marketing");
+    await userEvent.click(screen.getByRole("button", { name: /create board/i }));
+
+    expect(createBoard).toHaveBeenCalledWith("Marketing");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "New Board" })).toBeInTheDocument();
+    });
+  });
+
+  it("switches boards and reloads that board's data", async () => {
+    (listBoards as any).mockResolvedValue([
+      { id: 1, name: "My Board" },
+      { id: 2, name: "Marketing" },
+    ]);
+    (fetchBoard as any).mockImplementation((boardId: number) =>
+      Promise.resolve(
+        boardId === 2
+          ? { columns: DEFAULT_BOARD.columns, cards: {} }
+          : DEFAULT_BOARD
+      )
+    );
+
+    render(<KanbanBoard onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getByText("My Board")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /my board/i }));
+    await userEvent.click(screen.getByRole("option", { name: "Marketing" }));
+
+    await waitFor(() => {
+      expect(fetchBoard).toHaveBeenCalledWith(2);
+    });
+    await waitFor(() => {
+      expect(screen.getByText("Marketing")).toBeInTheDocument();
     });
   });
 });

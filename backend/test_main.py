@@ -15,11 +15,25 @@ def test_api_hello():
     assert response.status_code == 200
     assert response.json() == {"message": "Hello from FastAPI backend!"}
 
+def _first_board_id():
+    boards = client.get("/api/boards").json()
+    return boards[0]["id"]
+
+def test_list_boards():
+    response = client.get("/api/boards")
+    assert response.status_code == 200
+    boards = response.json()
+    assert len(boards) >= 1
+    assert "id" in boards[0]
+    assert "name" in boards[0]
+
 def test_get_board():
-    response = client.get("/api/board")
+    board_id = _first_board_id()
+    response = client.get(f"/api/boards/{board_id}")
     assert response.status_code == 200
     data = response.json()
     assert "board" in data
+    assert "name" in data
     # Should contain the default board structure
     import json
     board = json.loads(data["board"])
@@ -27,9 +41,15 @@ def test_get_board():
     assert "cards" in board
     assert len(board["columns"]) == 5
 
+def test_get_board_not_found():
+    response = client.get("/api/boards/999999")
+    assert response.status_code == 404
+
 def test_update_board():
+    board_id = _first_board_id()
+
     # First get current board
-    response = client.get("/api/board")
+    response = client.get(f"/api/boards/{board_id}")
     current_data = response.json()
 
     # Modify it (add a card)
@@ -39,15 +59,50 @@ def test_update_board():
     board["columns"][0]["cardIds"].append("test-card")
 
     # Update
-    update_response = client.put("/api/board", json={"board": board})
+    update_response = client.put(f"/api/boards/{board_id}", json={"board": board})
     assert update_response.status_code == 200
-    assert update_response.json() == {"message": "Board updated"}
+    assert update_response.json()["message"] == "Board updated"
 
     # Verify
-    get_response = client.get("/api/board")
+    get_response = client.get(f"/api/boards/{board_id}")
     new_data = get_response.json()
     new_board = json.loads(new_data["board"])
     assert "test-card" in new_board["cards"]
+
+def test_create_list_rename_delete_board():
+    # Create a second board
+    create_response = client.post("/api/boards", json={"name": "Marketing"})
+    assert create_response.status_code == 201
+    created = create_response.json()
+    assert created["name"] == "Marketing"
+    new_board_id = created["id"]
+
+    import json
+    empty_board = json.loads(created["board"])
+    assert empty_board["cards"] == {}
+    assert len(empty_board["columns"]) == 5
+
+    # It shows up in the list
+    boards = client.get("/api/boards").json()
+    assert any(b["id"] == new_board_id for b in boards)
+
+    # Rename it
+    rename_response = client.put(f"/api/boards/{new_board_id}", json={"name": "Renamed"})
+    assert rename_response.status_code == 200
+    assert rename_response.json()["name"] == "Renamed"
+
+    # Delete it
+    delete_response = client.delete(f"/api/boards/{new_board_id}")
+    assert delete_response.status_code == 200
+
+    boards_after = client.get("/api/boards").json()
+    assert not any(b["id"] == new_board_id for b in boards_after)
+
+def test_cannot_delete_only_board():
+    boards = client.get("/api/boards").json()
+    assert len(boards) == 1
+    response = client.delete(f"/api/boards/{boards[0]['id']}")
+    assert response.status_code == 400
 def test_validate_board_update():
     """Test board update validation."""
     from main import validate_board_update

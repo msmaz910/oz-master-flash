@@ -17,9 +17,11 @@ const SUGGESTIONS = [
 ];
 
 export const ChatSidebar = ({
+  boardId,
   onBoardUpdated,
   onClose,
 }: {
+  boardId: number;
   onBoardUpdated: () => Promise<void> | void;
   onClose?: () => void;
 }) => {
@@ -47,7 +49,7 @@ export const ChatSidebar = ({
     setMessages((prev) => [...prev, { role: "user", content: question }]);
 
     try {
-      const result = await sendChatMessage(question);
+      const result = await sendChatMessage(boardId, question);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: result.response || "No response." },

@@ -1,5 +1,6 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
+import json
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship
 from datetime import datetime, timezone
 
@@ -18,19 +19,20 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    boards = relationship("Board", back_populates="user")
+    boards = relationship("Board", back_populates="user", cascade="all, delete-orphan")
 
 class Board(Base):
     __tablename__ = "boards"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False, default="My Board")
     data = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="boards")
-    conversations = relationship("Conversation", back_populates="board")
+    conversations = relationship("Conversation", back_populates="board", cascade="all, delete-orphan")
 
 class Conversation(Base):
     __tablename__ = "conversations"
@@ -45,6 +47,18 @@ class Conversation(Base):
     user = relationship("User")
     board = relationship("Board", back_populates="conversations")
 
+def empty_board_data() -> str:
+    return json.dumps({
+        "columns": [
+            {"id": "col-backlog", "title": "Backlog", "cardIds": []},
+            {"id": "col-discovery", "title": "Discovery", "cardIds": []},
+            {"id": "col-progress", "title": "In Progress", "cardIds": []},
+            {"id": "col-review", "title": "Review", "cardIds": []},
+            {"id": "col-done", "title": "Done", "cardIds": []},
+        ],
+        "cards": {}
+    })
+
 def get_db():
     db = SessionLocal()
     try:
@@ -52,9 +66,20 @@ def get_db():
     finally:
         db.close()
 
+def _ensure_board_name_column():
+    """Lightweight migration: add boards.name if it doesn't exist yet (pre-multi-board DBs)."""
+    inspector = inspect(engine)
+    if "boards" not in inspector.get_table_names():
+        return
+    existing_columns = {col["name"] for col in inspector.get_columns("boards")}
+    if "name" not in existing_columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE boards ADD COLUMN name VARCHAR DEFAULT 'My Board'"))
+
 def init_db():
     Base.metadata.create_all(bind=engine)
-    # Create default user if not exists
+    _ensure_board_name_column()
+
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.username == "user").first()
@@ -64,6 +89,8 @@ def init_db():
             db.commit()
             db.refresh(user)
 
+        existing_board = db.query(Board).filter(Board.user_id == user.id).first()
+        if not existing_board:
             # Create default board with placeholder cards for testing
             default_data = '''{
   "columns": [
@@ -82,7 +109,7 @@ def init_db():
     "card-6": {"id": "card-6", "title": "Deploy to staging", "details": "Build Docker image and push to staging environment"}
   }
 }'''
-            board = Board(user_id=user.id, data=default_data)
+            board = Board(user_id=user.id, name="My Board", data=default_data)
             db.add(board)
             db.commit()
     finally:

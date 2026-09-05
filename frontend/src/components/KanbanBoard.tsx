@@ -15,6 +15,7 @@ import clsx from "clsx";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { ChatSidebar } from "@/components/ChatSidebar";
+import { BoardSwitcher } from "@/components/BoardSwitcher";
 import {
   BoardIcon,
   LogoutIcon,
@@ -23,7 +24,15 @@ import {
   SparkIcon,
 } from "@/components/icons";
 import { createId, initialData, moveCardInBoard, type BoardData, type Card } from "@/lib/kanban";
-import { fetchBoard, updateBoard } from "@/lib/api";
+import {
+  listBoards,
+  createBoard,
+  fetchBoard,
+  updateBoard,
+  renameBoard,
+  deleteBoard,
+  type BoardSummary,
+} from "@/lib/api";
 
 // Hex (not CSS vars) so accents can be composed with alpha suffixes for glows.
 const COLUMN_ACCENTS = ["#209dd7", "#753991", "#ecad0a", "#0ea5a4", "#ef6f5c"];
@@ -41,8 +50,12 @@ const toolbarButtonIdle =
 const toolbarButtonActive =
   "border-transparent bg-[var(--secondary-purple)] text-white shadow-[0_8px_18px_rgba(117,57,145,0.28)] hover:brightness-110";
 
+const LAST_BOARD_STORAGE_KEY = "pm-last-board-id";
+
 export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
+  const [boards, setBoards] = useState<BoardSummary[]>([]);
+  const [currentBoardId, setCurrentBoardId] = useState<number | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -51,23 +64,41 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    const loadBoard = async () => {
+    const init = async () => {
       try {
-        const data = await fetchBoard();
+        const boardList = await listBoards();
+        setBoards(boardList);
+
+        const storedId = Number(
+          typeof window !== "undefined" ? window.localStorage.getItem(LAST_BOARD_STORAGE_KEY) : null
+        );
+        const initialId =
+          boardList.find((b) => b.id === storedId)?.id ?? boardList[0]?.id ?? null;
+
+        if (initialId === null) {
+          throw new Error("No boards available");
+        }
+
+        const data = await fetchBoard(initialId);
+        setCurrentBoardId(initialId);
         setBoard(data);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(LAST_BOARD_STORAGE_KEY, String(initialId));
+        }
       } catch (err) {
-        setLoadError('Failed to load board');
+        setLoadError("Failed to load board");
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    loadBoard();
+    init();
   }, []);
 
-  const syncBoard = async (newBoard: BoardData) => {
+  const syncBoard = async (newBoard: BoardData, boardId: number | null = currentBoardId) => {
+    if (boardId === null) return;
     try {
-      await updateBoard(newBoard);
+      await updateBoard(boardId, newBoard);
       setSyncError(null);
     } catch (err) {
       setSyncError('Failed to save changes');
@@ -76,9 +107,10 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
   };
 
   const refreshBoard = async () => {
+    if (currentBoardId === null) return;
     setIsRefreshing(true);
     try {
-      const data = await fetchBoard();
+      const data = await fetchBoard(currentBoardId);
       setBoard(data);
       setSyncError(null);
     } catch (err) {
@@ -86,6 +118,63 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
       console.error(err);
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const switchToBoard = async (boardId: number) => {
+    setCurrentBoardId(boardId);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LAST_BOARD_STORAGE_KEY, String(boardId));
+    }
+    setLoading(true);
+    try {
+      const data = await fetchBoard(boardId);
+      setBoard(data);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError("Failed to load board");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateBoard = async (name: string) => {
+    try {
+      const created = await createBoard(name);
+      setBoards((prev) => [...prev, { id: created.id, name: created.name }]);
+      setCurrentBoardId(created.id);
+      setBoard(created.board);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(LAST_BOARD_STORAGE_KEY, String(created.id));
+      }
+    } catch (err) {
+      setSyncError("Failed to create board");
+      console.error(err);
+    }
+  };
+
+  const handleRenameBoard = async (boardId: number, name: string) => {
+    setBoards((prev) => prev.map((b) => (b.id === boardId ? { ...b, name } : b)));
+    try {
+      await renameBoard(boardId, name);
+    } catch (err) {
+      setSyncError("Failed to rename board");
+      console.error(err);
+    }
+  };
+
+  const handleDeleteBoard = async (boardId: number) => {
+    try {
+      await deleteBoard(boardId);
+      const remaining = boards.filter((b) => b.id !== boardId);
+      setBoards(remaining);
+      if (boardId === currentBoardId && remaining.length > 0) {
+        await switchToBoard(remaining[0].id);
+      }
+    } catch (err) {
+      setSyncError("Failed to delete board");
+      console.error(err);
     }
   };
 
@@ -224,7 +313,7 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
       <div className="pointer-events-none absolute left-0 top-0 h-[420px] w-[420px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-[radial-gradient(circle,_rgba(32,157,215,0.22)_0%,_rgba(32,157,215,0.05)_55%,_transparent_70%)]" />
       <div className="pointer-events-none absolute bottom-0 right-0 h-[520px] w-[520px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,_rgba(117,57,145,0.16)_0%,_rgba(117,57,145,0.05)_55%,_transparent_75%)]" />
 
-      <header className="relative z-10 shrink-0 border-b border-[var(--stroke)] bg-white/70 backdrop-blur">
+      <header className="relative z-20 shrink-0 border-b border-[var(--stroke)] bg-white/70 backdrop-blur">
         <div className="flex h-16 items-center gap-4 px-5">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--primary-blue),var(--secondary-purple))] text-white shadow-[0_8px_18px_rgba(32,157,215,0.35)]">
@@ -235,10 +324,19 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
                 Kanban Studio
               </h1>
               <p className="hidden text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--gray-text)] sm:block">
-                Single board workspace
+                {boards.length} {boards.length === 1 ? "board" : "boards"}
               </p>
             </div>
           </div>
+
+          <BoardSwitcher
+            boards={boards}
+            currentBoardId={currentBoardId}
+            onSelect={switchToBoard}
+            onCreate={handleCreateBoard}
+            onRename={handleRenameBoard}
+            onDelete={handleDeleteBoard}
+          />
 
           <div className="ml-2 hidden items-center gap-2 md:flex">
             <span className="rounded-full border border-[var(--stroke)] bg-white/70 px-3 py-1.5 text-xs font-semibold text-[var(--navy-dark)]">
@@ -331,13 +429,15 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
           </DragOverlay>
         </DndContext>
 
-        {isChatOpen ? (
+        {isChatOpen && currentBoardId !== null ? (
           // Always a real flex sibling (never absolutely positioned over the
           // board) so main's own width shrinks to make room for it at every
           // size, and every column stays reachable through main's own
           // horizontal scrollbar instead of being hidden behind an overlay.
           <div className="w-[340px] shrink-0 border-l border-[var(--stroke)] bg-white/60 backdrop-blur 2xl:w-[400px]">
             <ChatSidebar
+              key={currentBoardId}
+              boardId={currentBoardId}
               onBoardUpdated={refreshBoard}
               onClose={() => setIsChatOpen(false)}
             />
