@@ -22,6 +22,40 @@ export type Card = {
   dueDate?: string;
   priority?: Priority;
   comments?: Comment[];
+  labels?: string[];
+};
+
+export const normalizeLabels = (input: string): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of input.split(",")) {
+    const label = raw.trim();
+    if (!label) continue;
+    const key = label.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(label);
+  }
+  return result;
+};
+
+type LabelColor = { bg: string; text: string };
+
+const LABEL_PALETTE: LabelColor[] = [
+  { bg: "bg-blue-100", text: "text-blue-700" },
+  { bg: "bg-purple-100", text: "text-purple-700" },
+  { bg: "bg-teal-100", text: "text-teal-700" },
+  { bg: "bg-pink-100", text: "text-pink-700" },
+  { bg: "bg-orange-100", text: "text-orange-700" },
+  { bg: "bg-green-100", text: "text-green-700" },
+];
+
+export const labelColorFor = (label: string): LabelColor => {
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
+  }
+  return LABEL_PALETTE[hash % LABEL_PALETTE.length];
 };
 
 export const isOverdue = (dueDate: string | undefined, today: Date = new Date()): boolean => {
@@ -34,25 +68,31 @@ export type CardFilters = {
   query: string;
   priority: Priority | "all";
   overdueOnly: boolean;
+  label: string | "all";
 };
 
 export const EMPTY_FILTERS: CardFilters = {
   query: "",
   priority: "all",
   overdueOnly: false,
+  label: "all",
 };
 
 export const hasActiveFilters = (filters: CardFilters): boolean =>
-  filters.query.trim() !== "" || filters.priority !== "all" || filters.overdueOnly;
+  filters.query.trim() !== "" ||
+  filters.priority !== "all" ||
+  filters.overdueOnly ||
+  filters.label !== "all";
 
 export const cardMatchesFilters = (card: Card, filters: CardFilters): boolean => {
   const query = filters.query.trim().toLowerCase();
   if (query) {
-    const haystack = `${card.title} ${card.details}`.toLowerCase();
+    const haystack = `${card.title} ${card.details} ${(card.labels ?? []).join(" ")}`.toLowerCase();
     if (!haystack.includes(query)) return false;
   }
   if (filters.priority !== "all" && card.priority !== filters.priority) return false;
   if (filters.overdueOnly && !isOverdue(card.dueDate)) return false;
+  if (filters.label !== "all" && !(card.labels ?? []).includes(filters.label)) return false;
   return true;
 };
 

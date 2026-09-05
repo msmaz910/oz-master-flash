@@ -4,6 +4,8 @@ import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import {
   isOverdue,
+  labelColorFor,
+  normalizeLabels,
   PRIORITIES,
   PRIORITY_LABELS,
   type Card,
@@ -27,10 +29,27 @@ const PRIORITY_STYLES: Record<Priority, string> = {
 };
 
 export const CardMeta = ({ card }: { card: Card }) => {
-  if (!card.dueDate && !card.priority && !card.comments?.length) return null;
+  if (!card.dueDate && !card.priority && !card.comments?.length && !card.labels?.length) {
+    return null;
+  }
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {card.labels?.map((label) => {
+        const color = labelColorFor(label);
+        return (
+          <span
+            key={label}
+            className={clsx(
+              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              color.bg,
+              color.text
+            )}
+          >
+            {label}
+          </span>
+        );
+      })}
       {card.priority && (
         <span
           className={clsx(
@@ -69,7 +88,7 @@ type KanbanCardProps = {
   card: Card;
   accent: string;
   onDelete: (cardId: string) => void;
-  onEdit: (cardId: string, title: string, details: string, dueDate?: string, priority?: Priority) => void;
+  onEdit: (cardId: string, title: string, details: string, dueDate?: string, priority?: Priority, labels?: string[]) => void;
   onAddComment: (cardId: string, text: string) => void;
 };
 
@@ -84,6 +103,7 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
     details: card.details,
     dueDate: card.dueDate ?? "",
     priority: card.priority ?? ("" as Priority | ""),
+    labels: (card.labels ?? []).join(", "),
   });
 
   const style = {
@@ -97,6 +117,7 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
       details: card.details,
       dueDate: card.dueDate ?? "",
       priority: card.priority ?? "",
+      labels: (card.labels ?? []).join(", "),
     });
     setIsEditing(true);
   };
@@ -111,12 +132,14 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
     if (!title) {
       return;
     }
+    const labels = normalizeLabels(formState.labels);
     onEdit(
       card.id,
       title,
       formState.details.trim(),
       formState.dueDate || undefined,
-      formState.priority || undefined
+      formState.priority || undefined,
+      labels.length > 0 ? labels : undefined
     );
     setIsEditing(false);
   };
@@ -181,6 +204,15 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
             ))}
           </select>
         </div>
+        <input
+          value={formState.labels}
+          onChange={(event) =>
+            setFormState((prev) => ({ ...prev, labels: event.target.value }))
+          }
+          placeholder="Labels (comma-separated)"
+          aria-label="Labels"
+          className="w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
+        />
         <div className="flex items-center gap-2">
           <button
             type="submit"

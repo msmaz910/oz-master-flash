@@ -61,6 +61,28 @@ test("adds a card to a column", async ({ page }) => {
   await expect(firstColumn.getByText(uniqueTitle)).toBeVisible();
 });
 
+test("adds labels to a card and filters by label", async ({ page }) => {
+  await login(page);
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+  const cardTitle = `Labeled Card ${Date.now()}`;
+  await firstColumn.getByRole("button", { name: /add a card/i }).click();
+  await firstColumn.getByPlaceholder("Card title").fill(cardTitle);
+  const label = `e2e-label-${Date.now()}`;
+  const extraLabel = `e2e-extra-${Date.now()}`;
+  await firstColumn.getByLabel("Labels").fill(`${label}, ${extraLabel}`);
+  await firstColumn.getByRole("button", { name: /add card/i }).click();
+
+  await expect(firstColumn.getByText(label, { exact: true })).toBeVisible();
+  await expect(firstColumn.getByText(extraLabel, { exact: true })).toBeVisible();
+
+  await page.getByLabel("Filter by label").selectOption(label);
+  await expect(firstColumn.getByText(cardTitle)).toBeVisible();
+  await expect(firstColumn.getByText("Set up project repo")).not.toBeVisible();
+
+  await page.getByRole("button", { name: /clear filters/i }).click();
+  await expect(firstColumn.getByText("Set up project repo")).toBeVisible();
+});
+
 test("filters cards by search text", async ({ page }) => {
   await login(page);
   const firstColumn = page.locator('[data-testid^="column-"]').first();

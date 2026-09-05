@@ -7,6 +7,8 @@ import {
   isOverdue,
   appendActivity,
   MAX_ACTIVITY_ENTRIES,
+  normalizeLabels,
+  labelColorFor,
   type BoardData,
   type Column,
   type Card,
@@ -45,9 +47,51 @@ describe("cardMatchesFilters", () => {
   });
 
   it("requires every active filter to match", () => {
-    const filters = { query: "ship", priority: "high" as const, overdueOnly: true };
+    const filters = { ...EMPTY_FILTERS, query: "ship", priority: "high" as const, overdueOnly: true };
     expect(cardMatchesFilters(card, filters)).toBe(true);
     expect(cardMatchesFilters({ ...card, priority: "low" }, filters)).toBe(false);
+  });
+
+  it("filters by exact label", () => {
+    const labeled: Card = { ...card, labels: ["bug", "frontend"] };
+    expect(cardMatchesFilters(labeled, { ...EMPTY_FILTERS, label: "bug" })).toBe(true);
+    expect(cardMatchesFilters(labeled, { ...EMPTY_FILTERS, label: "backend" })).toBe(false);
+    expect(cardMatchesFilters(card, { ...EMPTY_FILTERS, label: "bug" })).toBe(false);
+  });
+
+  it("matches a search query against labels too", () => {
+    const labeled: Card = { ...card, labels: ["urgent-fix"] };
+    expect(cardMatchesFilters(labeled, { ...EMPTY_FILTERS, query: "urgent" })).toBe(true);
+  });
+});
+
+describe("normalizeLabels", () => {
+  it("splits comma-separated text into trimmed labels", () => {
+    expect(normalizeLabels("bug, frontend ,  urgent")).toEqual(["bug", "frontend", "urgent"]);
+  });
+
+  it("drops empty entries", () => {
+    expect(normalizeLabels("bug,, ,frontend")).toEqual(["bug", "frontend"]);
+  });
+
+  it("dedupes case-insensitively, keeping the first casing seen", () => {
+    expect(normalizeLabels("Bug, bug, BUG")).toEqual(["Bug"]);
+  });
+
+  it("returns an empty array for blank input", () => {
+    expect(normalizeLabels("   ")).toEqual([]);
+  });
+});
+
+describe("labelColorFor", () => {
+  it("is stable for the same label", () => {
+    expect(labelColorFor("bug")).toEqual(labelColorFor("bug"));
+  });
+
+  it("returns a bg/text class pair", () => {
+    const color = labelColorFor("frontend");
+    expect(color.bg).toMatch(/^bg-/);
+    expect(color.text).toMatch(/^text-/);
   });
 });
 
@@ -60,6 +104,7 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters({ ...EMPTY_FILTERS, query: "x" })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, priority: "low" })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, overdueOnly: true })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, label: "bug" })).toBe(true);
   });
 });
 

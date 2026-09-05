@@ -285,7 +285,8 @@ export const KanbanBoard = ({
     title: string,
     details: string,
     dueDate?: string,
-    priority?: Priority
+    priority?: Priority,
+    labels?: string[]
   ) => {
     const id = createId("card");
     const newBoard = logActivity(
@@ -293,7 +294,7 @@ export const KanbanBoard = ({
         ...board,
         cards: {
           ...board.cards,
-          [id]: { id, title, details: details || "No details yet.", dueDate, priority },
+          [id]: { id, title, details: details || "No details yet.", dueDate, priority, labels },
         },
         columns: board.columns.map((column) =>
           column.id === columnId
@@ -335,14 +336,15 @@ export const KanbanBoard = ({
     title: string,
     details: string,
     dueDate?: string,
-    priority?: Priority
+    priority?: Priority,
+    labels?: string[]
   ) => {
     const newBoard = logActivity(
       {
         ...board,
         cards: {
           ...board.cards,
-          [cardId]: { ...board.cards[cardId], title, details, dueDate, priority },
+          [cardId]: { ...board.cards[cardId], title, details, dueDate, priority, labels },
         },
       },
       `${actor} edited "${title}"`
@@ -394,6 +396,12 @@ export const KanbanBoard = ({
     () => Object.values(board.cards).filter((card) => cardMatchesFilters(card, filters)).length,
     [board.cards, filters]
   );
+
+  const availableLabels = useMemo(() => {
+    const labels = new Set<string>();
+    Object.values(board.cards).forEach((card) => card.labels?.forEach((label) => labels.add(label)));
+    return Array.from(labels).sort((a, b) => a.localeCompare(b));
+  }, [board.cards]);
 
   if (loading) {
     return (
@@ -538,6 +546,7 @@ export const KanbanBoard = ({
         onChange={setFilters}
         visibleCount={visibleCardCount}
         totalCount={totalCards}
+        availableLabels={availableLabels}
       />
 
       <div className="relative z-10 flex min-h-0 flex-1">

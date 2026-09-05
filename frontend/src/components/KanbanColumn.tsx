@@ -14,9 +14,9 @@ type KanbanColumnProps = {
   canDelete: boolean;
   onRename: (columnId: string, title: string) => void;
   onRenameBlur: (columnId: string) => void;
-  onAddCard: (columnId: string, title: string, details: string, dueDate?: string, priority?: Priority) => void;
+  onAddCard: (columnId: string, title: string, details: string, dueDate?: string, priority?: Priority, labels?: string[]) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
-  onEditCard: (cardId: string, title: string, details: string, dueDate?: string, priority?: Priority) => void;
+  onEditCard: (cardId: string, title: string, details: string, dueDate?: string, priority?: Priority, labels?: string[]) => void;
   onDeleteColumn: (columnId: string) => void;
   onAddComment: (cardId: string, text: string) => void;
 };
@@ -113,8 +113,8 @@ export const KanbanColumn = ({
       <div className="shrink-0 px-3 pb-3">
         <NewCardForm
           accent={accent}
-          onAdd={(title, details, dueDate, priority) =>
-            onAddCard(column.id, title, details, dueDate, priority)
+          onAdd={(title, details, dueDate, priority, labels) =>
+            onAddCard(column.id, title, details, dueDate, priority, labels)
           }
         />
       </div>

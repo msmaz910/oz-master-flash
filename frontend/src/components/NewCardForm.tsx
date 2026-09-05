@@ -1,17 +1,30 @@
 import { useState, type FormEvent } from "react";
 import { PlusIcon, CheckIcon, CloseIcon } from "@/components/icons";
-import { PRIORITIES, PRIORITY_LABELS, type Priority } from "@/lib/kanban";
+import { PRIORITIES, PRIORITY_LABELS, normalizeLabels, type Priority } from "@/lib/kanban";
 
-const initialFormState: { title: string; details: string; dueDate: string; priority: Priority | "" } = {
+const initialFormState: {
+  title: string;
+  details: string;
+  dueDate: string;
+  priority: Priority | "";
+  labels: string;
+} = {
   title: "",
   details: "",
   dueDate: "",
   priority: "",
+  labels: "",
 };
 
 type NewCardFormProps = {
   accent: string;
-  onAdd: (title: string, details: string, dueDate?: string, priority?: Priority) => void;
+  onAdd: (
+    title: string,
+    details: string,
+    dueDate?: string,
+    priority?: Priority,
+    labels?: string[]
+  ) => void;
 };
 
 export const NewCardForm = ({ accent, onAdd }: NewCardFormProps) => {
@@ -23,11 +36,13 @@ export const NewCardForm = ({ accent, onAdd }: NewCardFormProps) => {
     if (!formState.title.trim()) {
       return;
     }
+    const labels = normalizeLabels(formState.labels);
     onAdd(
       formState.title.trim(),
       formState.details.trim(),
       formState.dueDate || undefined,
-      formState.priority || undefined
+      formState.priority || undefined,
+      labels.length > 0 ? labels : undefined
     );
     setFormState(initialFormState);
     setIsOpen(false);
@@ -99,6 +114,15 @@ export const NewCardForm = ({ accent, onAdd }: NewCardFormProps) => {
           ))}
         </select>
       </div>
+      <input
+        value={formState.labels}
+        onChange={(event) =>
+          setFormState((prev) => ({ ...prev, labels: event.target.value }))
+        }
+        placeholder="Labels (comma-separated)"
+        aria-label="Labels"
+        className="w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
+      />
       <div className="flex items-center gap-2">
         <button
           type="submit"

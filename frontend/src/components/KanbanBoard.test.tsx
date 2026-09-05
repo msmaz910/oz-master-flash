@@ -358,6 +358,49 @@ describe("KanbanBoard", () => {
     expect(screen.queryByText("Nice to have")).not.toBeInTheDocument();
   });
 
+  it("adds comma-separated labels to a card and shows them as pills", async () => {
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+    const column = getFirstColumn();
+    await userEvent.click(within(column).getByRole("button", { name: /add a card/i }));
+    await userEvent.type(within(column).getByPlaceholderText(/card title/i), "Labeled card");
+    await userEvent.type(within(column).getByLabelText("Labels"), "bug, frontend, bug");
+    await userEvent.click(within(column).getByRole("button", { name: /add card/i }));
+
+    expect(within(column).getByText("bug")).toBeInTheDocument();
+    expect(within(column).getByText("frontend")).toBeInTheDocument();
+  });
+
+  it("filters cards by label and offers the label filter only once labels exist", async () => {
+    (fetchBoard as any).mockResolvedValue({
+      columns: [{ id: "col1", title: "To Do", cardIds: ["card-a", "card-b"] }],
+      cards: {
+        "card-a": { id: "card-a", title: "Backend task", details: "", labels: ["backend"] },
+        "card-b": { id: "card-b", title: "Frontend task", details: "", labels: ["frontend"] },
+      },
+    });
+
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getByText("Backend task")).toBeInTheDocument();
+    });
+
+    await userEvent.selectOptions(screen.getByLabelText("Filter by label"), "frontend");
+
+    expect(screen.getByText("Frontend task")).toBeInTheDocument();
+    expect(screen.queryByText("Backend task")).not.toBeInTheDocument();
+  });
+
+  it("does not show the label filter when no cards have labels", async () => {
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+    expect(screen.queryByLabelText("Filter by label")).not.toBeInTheDocument();
+  });
+
   it("shows a 'no cards match' message distinct from the empty-column message", async () => {
     (fetchBoard as any).mockResolvedValue({
       columns: [

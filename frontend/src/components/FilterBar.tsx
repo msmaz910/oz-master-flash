@@ -1,4 +1,4 @@
-import { PRIORITIES, PRIORITY_LABELS, hasActiveFilters, type CardFilters, type Priority } from "@/lib/kanban";
+import { PRIORITIES, PRIORITY_LABELS, hasActiveFilters, EMPTY_FILTERS, type CardFilters, type Priority } from "@/lib/kanban";
 import { CloseIcon } from "@/components/icons";
 
 type FilterBarProps = {
@@ -6,12 +6,19 @@ type FilterBarProps = {
   onChange: (filters: CardFilters) => void;
   visibleCount: number;
   totalCount: number;
+  availableLabels: string[];
 };
 
 const fieldClass =
   "rounded-xl border border-[var(--stroke)] bg-white/70 px-3 py-1.5 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white";
 
-export const FilterBar = ({ filters, onChange, visibleCount, totalCount }: FilterBarProps) => {
+export const FilterBar = ({
+  filters,
+  onChange,
+  visibleCount,
+  totalCount,
+  availableLabels,
+}: FilterBarProps) => {
   const isFiltering = hasActiveFilters(filters);
 
   return (
@@ -38,6 +45,21 @@ export const FilterBar = ({ filters, onChange, visibleCount, totalCount }: Filte
           </option>
         ))}
       </select>
+      {availableLabels.length > 0 && (
+        <select
+          value={filters.label}
+          onChange={(event) => onChange({ ...filters, label: event.target.value })}
+          aria-label="Filter by label"
+          className={fieldClass}
+        >
+          <option value="all">Any label</option>
+          {availableLabels.map((label) => (
+            <option key={label} value={label}>
+              {label}
+            </option>
+          ))}
+        </select>
+      )}
       <label className="flex items-center gap-1.5 text-sm text-[var(--navy-dark)]">
         <input
           type="checkbox"
@@ -53,7 +75,7 @@ export const FilterBar = ({ filters, onChange, visibleCount, totalCount }: Filte
           </span>
           <button
             type="button"
-            onClick={() => onChange({ query: "", priority: "all", overdueOnly: false })}
+            onClick={() => onChange(EMPTY_FILTERS)}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-[var(--secondary-purple)] transition hover:bg-[var(--surface)]"
           >
             <CloseIcon className="h-3.5 w-3.5" />
