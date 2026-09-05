@@ -23,7 +23,7 @@ import {
   RefreshIcon,
   SparkIcon,
 } from "@/components/icons";
-import { createId, initialData, moveCardInBoard, type BoardData, type Card } from "@/lib/kanban";
+import { createId, initialData, moveCardInBoard, type BoardData, type Card, type Priority } from "@/lib/kanban";
 import {
   listBoards,
   createBoard,
@@ -223,13 +223,19 @@ export const KanbanBoard = ({
     syncBoard(board);
   };
 
-  const handleAddCard = (columnId: string, title: string, details: string) => {
+  const handleAddCard = (
+    columnId: string,
+    title: string,
+    details: string,
+    dueDate?: string,
+    priority?: Priority
+  ) => {
     const id = createId("card");
     const newBoard = {
       ...board,
       cards: {
         ...board.cards,
-        [id]: { id, title, details: details || "No details yet." },
+        [id]: { id, title, details: details || "No details yet.", dueDate, priority },
       },
       columns: board.columns.map((column) =>
         column.id === columnId
@@ -260,12 +266,18 @@ export const KanbanBoard = ({
     syncBoard(newBoard);
   };
 
-  const handleEditCard = (cardId: string, title: string, details: string) => {
+  const handleEditCard = (
+    cardId: string,
+    title: string,
+    details: string,
+    dueDate?: string,
+    priority?: Priority
+  ) => {
     const newBoard = {
       ...board,
       cards: {
         ...board.cards,
-        [cardId]: { ...board.cards[cardId], title, details },
+        [cardId]: { ...board.cards[cardId], title, details, dueDate, priority },
       },
     };
     setBoard(newBoard);

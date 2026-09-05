@@ -2,14 +2,59 @@ import { useState, type FormEvent } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import type { Card } from "@/lib/kanban";
-import { CheckIcon, CloseIcon, EditIcon, TrashIcon } from "@/components/icons";
+import {
+  isOverdue,
+  PRIORITIES,
+  PRIORITY_LABELS,
+  type Card,
+  type Priority,
+} from "@/lib/kanban";
+import { CalendarIcon, CheckIcon, CloseIcon, EditIcon, FlagIcon, TrashIcon } from "@/components/icons";
+
+const PRIORITY_STYLES: Record<Priority, string> = {
+  low: "bg-slate-100 text-slate-600",
+  medium: "bg-amber-100 text-amber-700",
+  high: "bg-red-100 text-red-600",
+};
+
+export const CardMeta = ({ card }: { card: Card }) => {
+  if (!card.dueDate && !card.priority) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {card.priority && (
+        <span
+          className={clsx(
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+            PRIORITY_STYLES[card.priority]
+          )}
+        >
+          <FlagIcon className="h-3 w-3" />
+          {PRIORITY_LABELS[card.priority]}
+        </span>
+      )}
+      {card.dueDate && (
+        <span
+          className={clsx(
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            isOverdue(card.dueDate)
+              ? "bg-red-100 text-red-600"
+              : "bg-[var(--surface)] text-[var(--gray-text)]"
+          )}
+        >
+          <CalendarIcon className="h-3 w-3" />
+          {card.dueDate}
+        </span>
+      )}
+    </div>
+  );
+};
 
 type KanbanCardProps = {
   card: Card;
   accent: string;
   onDelete: (cardId: string) => void;
-  onEdit: (cardId: string, title: string, details: string) => void;
+  onEdit: (cardId: string, title: string, details: string, dueDate?: string, priority?: Priority) => void;
 };
 
 export const KanbanCard = ({ card, accent, onDelete, onEdit }: KanbanCardProps) => {
@@ -17,7 +62,12 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit }: KanbanCardProps) 
     useSortable({ id: card.id, disabled: false });
 
   const [isEditing, setIsEditing] = useState(false);
-  const [formState, setFormState] = useState({ title: card.title, details: card.details });
+  const [formState, setFormState] = useState({
+    title: card.title,
+    details: card.details,
+    dueDate: card.dueDate ?? "",
+    priority: card.priority ?? ("" as Priority | ""),
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -25,12 +75,16 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit }: KanbanCardProps) 
   };
 
   const startEditing = () => {
-    setFormState({ title: card.title, details: card.details });
+    setFormState({
+      title: card.title,
+      details: card.details,
+      dueDate: card.dueDate ?? "",
+      priority: card.priority ?? "",
+    });
     setIsEditing(true);
   };
 
   const cancelEditing = () => {
-    setFormState({ title: card.title, details: card.details });
     setIsEditing(false);
   };
 
@@ -40,7 +94,13 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit }: KanbanCardProps) 
     if (!title) {
       return;
     }
-    onEdit(card.id, title, formState.details.trim());
+    onEdit(
+      card.id,
+      title,
+      formState.details.trim(),
+      formState.dueDate || undefined,
+      formState.priority || undefined
+    );
     setIsEditing(false);
   };
 
@@ -75,6 +135,35 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit }: KanbanCardProps) 
           className="w-full resize-none rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
           aria-label="Card details"
         />
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={formState.dueDate}
+            onChange={(event) =>
+              setFormState((prev) => ({ ...prev, dueDate: event.target.value }))
+            }
+            aria-label="Due date"
+            className="flex-1 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
+          />
+          <select
+            value={formState.priority}
+            onChange={(event) =>
+              setFormState((prev) => ({
+                ...prev,
+                priority: event.target.value as Priority | "",
+              }))
+            }
+            aria-label="Priority"
+            className="flex-1 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
+          >
+            <option value="">No priority</option>
+            {PRIORITIES.map((priority) => (
+              <option key={priority} value={priority}>
+                {PRIORITY_LABELS[priority]}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="submit"
@@ -125,6 +214,7 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit }: KanbanCardProps) 
           <p className="mt-1.5 text-[13px] leading-5 text-[var(--gray-text)]">
             {card.details}
           </p>
+          <CardMeta card={card} />
         </div>
         <div
           className={clsx(

@@ -92,6 +92,20 @@ export const ChevronDownIcon = (props: IconProps) => (
   </svg>
 );
 
+export const CalendarIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <rect x="3.5" y="5" width="17" height="16" rx="2" />
+    <path d="M8 3v4M16 3v4M3.5 10h17" />
+  </svg>
+);
+
+export const FlagIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <path d="M5 4v16" />
+    <path d="M5 5h11l-2.5 3.5L16 12H5" />
+  </svg>
+);
+
 export const PanelIcon = (props: IconProps) => (
   <svg {...base} {...props}>
     <rect x="3" y="4" width="18" height="16" rx="2.5" />

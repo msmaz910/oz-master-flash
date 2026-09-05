@@ -1,11 +1,17 @@
 import { useState, type FormEvent } from "react";
 import { PlusIcon, CheckIcon, CloseIcon } from "@/components/icons";
+import { PRIORITIES, PRIORITY_LABELS, type Priority } from "@/lib/kanban";
 
-const initialFormState = { title: "", details: "" };
+const initialFormState: { title: string; details: string; dueDate: string; priority: Priority | "" } = {
+  title: "",
+  details: "",
+  dueDate: "",
+  priority: "",
+};
 
 type NewCardFormProps = {
   accent: string;
-  onAdd: (title: string, details: string) => void;
+  onAdd: (title: string, details: string, dueDate?: string, priority?: Priority) => void;
 };
 
 export const NewCardForm = ({ accent, onAdd }: NewCardFormProps) => {
@@ -17,7 +23,12 @@ export const NewCardForm = ({ accent, onAdd }: NewCardFormProps) => {
     if (!formState.title.trim()) {
       return;
     }
-    onAdd(formState.title.trim(), formState.details.trim());
+    onAdd(
+      formState.title.trim(),
+      formState.details.trim(),
+      formState.dueDate || undefined,
+      formState.priority || undefined
+    );
     setFormState(initialFormState);
     setIsOpen(false);
   };
@@ -59,6 +70,35 @@ export const NewCardForm = ({ accent, onAdd }: NewCardFormProps) => {
         rows={2}
         className="w-full resize-none rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
       />
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={formState.dueDate}
+          onChange={(event) =>
+            setFormState((prev) => ({ ...prev, dueDate: event.target.value }))
+          }
+          aria-label="Due date"
+          className="flex-1 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
+        />
+        <select
+          value={formState.priority}
+          onChange={(event) =>
+            setFormState((prev) => ({
+              ...prev,
+              priority: event.target.value as Priority | "",
+            }))
+          }
+          aria-label="Priority"
+          className="flex-1 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
+        >
+          <option value="">No priority</option>
+          {PRIORITIES.map((priority) => (
+            <option key={priority} value={priority}>
+              {PRIORITY_LABELS[priority]}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="flex items-center gap-2">
         <button
           type="submit"

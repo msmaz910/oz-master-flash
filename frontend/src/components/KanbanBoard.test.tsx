@@ -158,6 +158,51 @@ describe("KanbanBoard", () => {
     expect(within(column).queryByText("Should not save")).not.toBeInTheDocument();
   });
 
+  it("adds a card with a due date and priority", async () => {
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+    const column = getFirstColumn();
+    await userEvent.click(within(column).getByRole("button", { name: /add a card/i }));
+    await userEvent.type(within(column).getByPlaceholderText(/card title/i), "Ship release");
+    await userEvent.type(within(column).getByLabelText("Due date"), "2099-01-15");
+    await userEvent.selectOptions(within(column).getByLabelText("Priority"), "high");
+    await userEvent.click(within(column).getByRole("button", { name: /add card/i }));
+
+    expect(within(column).getByText("Ship release")).toBeInTheDocument();
+    expect(within(column).getByText("High")).toBeInTheDocument();
+    expect(within(column).getByText("2099-01-15")).toBeInTheDocument();
+  });
+
+  it("edits a card to set and then clear priority and due date", async () => {
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+    const column = getFirstColumn();
+    await userEvent.click(within(column).getByRole("button", { name: /add a card/i }));
+    await userEvent.type(within(column).getByPlaceholderText(/card title/i), "Plain card");
+    await userEvent.click(within(column).getByRole("button", { name: /add card/i }));
+
+    await userEvent.click(within(column).getByRole("button", { name: /edit plain card/i }));
+    await userEvent.type(within(column).getByLabelText("Due date"), "2099-06-01");
+    await userEvent.selectOptions(within(column).getByLabelText("Priority"), "medium");
+    await userEvent.click(within(column).getByRole("button", { name: /save/i }));
+
+    expect(within(column).getByText("Medium")).toBeInTheDocument();
+    expect(within(column).getByText("2099-06-01")).toBeInTheDocument();
+
+    // Clear both fields back out
+    await userEvent.click(within(column).getByRole("button", { name: /edit plain card/i }));
+    await userEvent.clear(within(column).getByLabelText("Due date"));
+    await userEvent.selectOptions(within(column).getByLabelText("Priority"), "");
+    await userEvent.click(within(column).getByRole("button", { name: /save/i }));
+
+    expect(within(column).queryByText("Medium")).not.toBeInTheDocument();
+    expect(within(column).queryByText("2099-06-01")).not.toBeInTheDocument();
+  });
+
   it("shows loading state initially", () => {
     render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     expect(screen.getByText("Loading your board...")).toBeInTheDocument();

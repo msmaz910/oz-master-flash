@@ -1,7 +1,25 @@
+export type Priority = "low" | "medium" | "high";
+
+export const PRIORITIES: Priority[] = ["low", "medium", "high"];
+
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
 export type Card = {
   id: string;
   title: string;
   details: string;
+  dueDate?: string;
+  priority?: Priority;
+};
+
+export const isOverdue = (dueDate: string | undefined, today: Date = new Date()): boolean => {
+  if (!dueDate) return false;
+  const todayStr = today.toISOString().slice(0, 10);
+  return dueDate < todayStr;
 };
 
 export type Column = {

@@ -17,30 +17,12 @@ from security import hash_password, verify_password, generate_token
 from ai_service import ai_service
 
 # Pydantic schemas
-class BoardColumn(BaseModel):
-    id: str
-    title: str
-    cardIds: list[str]
-
-class BoardCard(BaseModel):
-    id: str
-    title: str
-    details: str
-
-class BoardData(BaseModel):
-    columns: list[BoardColumn]
-    cards: dict[str, BoardCard]
-
 class BoardUpdateRequest(BaseModel):
     board: Optional[Any] = None
     name: Optional[str] = None
 
 class BoardCreateRequest(BaseModel):
     name: Optional[str] = None
-
-class AIStructuredResponse(BaseModel):
-    response: str
-    kanbanUpdate: Optional[BoardData] = None
 
 class ChatRequest(BaseModel):
     question: str
