@@ -79,6 +79,75 @@ describe("KanbanBoard", () => {
     expect(within(column).queryByText("New card")).not.toBeInTheDocument();
   });
 
+  it("edits a card's title and details", async () => {
+    render(<KanbanBoard onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+    const column = getFirstColumn();
+    await userEvent.click(
+      within(column).getByRole("button", { name: /add a card/i })
+    );
+    await userEvent.type(
+      within(column).getByPlaceholderText(/card title/i),
+      "Original title"
+    );
+    await userEvent.click(
+      within(column).getByRole("button", { name: /add card/i })
+    );
+    expect(within(column).getByText("Original title")).toBeInTheDocument();
+
+    await userEvent.click(
+      within(column).getByRole("button", { name: /edit original title/i })
+    );
+
+    const titleInput = within(column).getByLabelText("Card title");
+    await userEvent.clear(titleInput);
+    await userEvent.type(titleInput, "Updated title");
+    const detailsInput = within(column).getByLabelText("Card details");
+    await userEvent.clear(detailsInput);
+    await userEvent.type(detailsInput, "Updated details");
+
+    await userEvent.click(within(column).getByRole("button", { name: /save/i }));
+
+    expect(within(column).getByText("Updated title")).toBeInTheDocument();
+    expect(within(column).getByText("Updated details")).toBeInTheDocument();
+    expect(within(column).queryByText("Original title")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(updateBoard).toHaveBeenCalled();
+    });
+  });
+
+  it("cancels editing a card without saving changes", async () => {
+    render(<KanbanBoard onLogout={mockOnLogout} />);
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+    const column = getFirstColumn();
+    await userEvent.click(
+      within(column).getByRole("button", { name: /add a card/i })
+    );
+    await userEvent.type(
+      within(column).getByPlaceholderText(/card title/i),
+      "Keep me"
+    );
+    await userEvent.click(
+      within(column).getByRole("button", { name: /add card/i })
+    );
+
+    await userEvent.click(
+      within(column).getByRole("button", { name: /edit keep me/i })
+    );
+    const titleInput = within(column).getByLabelText("Card title");
+    await userEvent.clear(titleInput);
+    await userEvent.type(titleInput, "Should not save");
+
+    await userEvent.click(within(column).getByRole("button", { name: /cancel/i }));
+
+    expect(within(column).getByText("Keep me")).toBeInTheDocument();
+    expect(within(column).queryByText("Should not save")).not.toBeInTheDocument();
+  });
+
   it("shows loading state initially", () => {
     render(<KanbanBoard onLogout={mockOnLogout} />);
     expect(screen.getByText("Loading your board...")).toBeInTheDocument();

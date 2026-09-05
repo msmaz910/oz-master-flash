@@ -165,6 +165,18 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
     syncBoard(newBoard);
   };
 
+  const handleEditCard = (cardId: string, title: string, details: string) => {
+    const newBoard = {
+      ...board,
+      cards: {
+        ...board.cards,
+        [cardId]: { ...board.cards[cardId], title, details },
+      },
+    };
+    setBoard(newBoard);
+    syncBoard(newBoard);
+  };
+
   const activeCard = activeCardId ? board.cards[activeCardId] : null;
   const activeCardAccent = useMemo(() => {
     if (!activeCardId) return undefined;
@@ -305,6 +317,7 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
                   onRenameBlur={handleRenameColumnBlur}
                   onAddCard={handleAddCard}
                   onDeleteCard={handleDeleteCard}
+                  onEditCard={handleEditCard}
                 />
               ))}
             </section>

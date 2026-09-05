@@ -79,6 +79,13 @@ export const BoardIcon = (props: IconProps) => (
   </svg>
 );
 
+export const EditIcon = (props: IconProps) => (
+  <svg {...base} {...props}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+
 export const PanelIcon = (props: IconProps) => (
   <svg {...base} {...props}>
     <rect x="3" y="4" width="18" height="16" rx="2.5" />
