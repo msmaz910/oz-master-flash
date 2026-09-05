@@ -4,6 +4,8 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, F
 from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship
 from datetime import datetime, timezone
 
+from security import hash_password
+
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./kanban.db")
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -17,9 +19,11 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False, default="")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     boards = relationship("Board", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 
 class Board(Base):
     __tablename__ = "boards"
@@ -46,6 +50,16 @@ class Conversation(Base):
 
     user = relationship("User")
     board = relationship("Board", back_populates="conversations")
+
+class UserSession(Base):
+    __tablename__ = "sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String, unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User", back_populates="sessions")
 
 def empty_board_data() -> str:
     return json.dumps({
@@ -76,18 +90,33 @@ def _ensure_board_name_column():
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE boards ADD COLUMN name VARCHAR DEFAULT 'My Board'"))
 
+def _ensure_user_password_column():
+    """Lightweight migration: add users.password_hash if it doesn't exist yet (pre-auth DBs)."""
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    existing_columns = {col["name"] for col in inspector.get_columns("users")}
+    if "password_hash" not in existing_columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR DEFAULT ''"))
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     _ensure_board_name_column()
+    _ensure_user_password_column()
 
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.username == "user").first()
         if not user:
-            user = User(username="user")
+            user = User(username="user", password_hash=hash_password("password"))
             db.add(user)
             db.commit()
             db.refresh(user)
+        elif not user.password_hash:
+            # Backfill the documented demo credentials for pre-auth databases.
+            user.password_hash = hash_password("password")
+            db.commit()
 
         existing_board = db.query(Board).filter(Board.user_id == user.id).first()
         if not existing_board:

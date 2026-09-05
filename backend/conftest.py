@@ -22,6 +22,7 @@ def override_get_db():
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_app():
     from models import Base, User, Board, get_db
+    from security import hash_password
     from main import app
 
     # Create all tables in the in-memory database
@@ -30,7 +31,7 @@ def setup_test_app():
     # Seed default user and board
     db = TestSessionLocal()
     try:
-        user = User(username="user")
+        user = User(username="user", password_hash=hash_password("password"))
         db.add(user)
         db.commit()
         db.refresh(user)

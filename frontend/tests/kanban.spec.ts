@@ -21,7 +21,28 @@ test("login with invalid credentials", async ({ page }) => {
   await page.getByLabel("Username").fill("wrong");
   await page.getByLabel("Password").fill("wrong");
   await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page.getByText("Invalid credentials")).toBeVisible();
+  await expect(page.getByText("Invalid username or password")).toBeVisible();
+});
+
+test("registers a new user with their own isolated board", async ({ page }) => {
+  await page.goto("/");
+  await page.getByText(/need an account/i).click();
+
+  const newUsername = `e2e-user-${Date.now()}`;
+  await page.getByLabel("Username").fill(newUsername);
+  await page.getByLabel("Password").fill("securepass123");
+  await page.getByRole("button", { name: /create account/i }).click();
+
+  await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "My Board" })).toBeVisible();
+  await expect(page.locator('[data-testid^="column-"]')).toHaveCount(5);
+
+  // Brand-new account's board starts empty, unlike the demo user's seeded board
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+  await expect(firstColumn.getByText(/drop a card here/i)).toBeVisible();
+
+  await page.getByRole("button", { name: /sign out/i }).click();
+  await expect(page.getByLabel("Username")).toBeVisible();
 });
 
 test("loads the kanban board", async ({ page }) => {

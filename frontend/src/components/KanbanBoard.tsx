@@ -50,9 +50,15 @@ const toolbarButtonIdle =
 const toolbarButtonActive =
   "border-transparent bg-[var(--secondary-purple)] text-white shadow-[0_8px_18px_rgba(117,57,145,0.28)] hover:brightness-110";
 
-const LAST_BOARD_STORAGE_KEY = "pm-last-board-id";
+const lastBoardStorageKey = (username: string | null) => `pm-last-board-id:${username ?? "guest"}`;
 
-export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
+export const KanbanBoard = ({
+  username,
+  onLogout,
+}: {
+  username: string | null;
+  onLogout: () => void;
+}) => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [currentBoardId, setCurrentBoardId] = useState<number | null>(null);
@@ -70,7 +76,7 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
         setBoards(boardList);
 
         const storedId = Number(
-          typeof window !== "undefined" ? window.localStorage.getItem(LAST_BOARD_STORAGE_KEY) : null
+          typeof window !== "undefined" ? window.localStorage.getItem(lastBoardStorageKey(username)) : null
         );
         const initialId =
           boardList.find((b) => b.id === storedId)?.id ?? boardList[0]?.id ?? null;
@@ -83,7 +89,7 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
         setCurrentBoardId(initialId);
         setBoard(data);
         if (typeof window !== "undefined") {
-          window.localStorage.setItem(LAST_BOARD_STORAGE_KEY, String(initialId));
+          window.localStorage.setItem(lastBoardStorageKey(username), String(initialId));
         }
       } catch (err) {
         setLoadError("Failed to load board");
@@ -124,7 +130,7 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
   const switchToBoard = async (boardId: number) => {
     setCurrentBoardId(boardId);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(LAST_BOARD_STORAGE_KEY, String(boardId));
+      window.localStorage.setItem(lastBoardStorageKey(username), String(boardId));
     }
     setLoading(true);
     try {
@@ -146,7 +152,7 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
       setCurrentBoardId(created.id);
       setBoard(created.board);
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(LAST_BOARD_STORAGE_KEY, String(created.id));
+        window.localStorage.setItem(lastBoardStorageKey(username), String(created.id));
       }
     } catch (err) {
       setSyncError("Failed to create board");
@@ -375,10 +381,15 @@ export const KanbanBoard = ({ onLogout }: { onLogout: () => void }) => {
               <SparkIcon className="h-[18px] w-[18px]" />
             </button>
             <span className="mx-1 h-6 w-px bg-[var(--stroke)]" />
+            {username && (
+              <span className="hidden text-xs font-semibold text-[var(--gray-text)] sm:inline">
+                {username}
+              </span>
+            )}
             <button
               onClick={onLogout}
               className={clsx(toolbarButtonBase, toolbarButtonIdle)}
-              title="Sign out"
+              title={username ? `Sign out (${username})` : "Sign out"}
               aria-label="Sign out"
             >
               <LogoutIcon className="h-[18px] w-[18px]" />

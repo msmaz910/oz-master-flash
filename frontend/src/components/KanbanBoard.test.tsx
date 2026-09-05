@@ -43,14 +43,14 @@ describe("KanbanBoard", () => {
   });
 
   it("renders five columns after loading", async () => {
-    render(<KanbanBoard onLogout={mockOnLogout} />);
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {
       expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
     });
   });
 
   it("renames a column", async () => {
-    render(<KanbanBoard onLogout={mockOnLogout} />);
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {
       expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
     });
@@ -62,7 +62,7 @@ describe("KanbanBoard", () => {
   });
 
   it("adds and removes a card", async () => {
-    render(<KanbanBoard onLogout={mockOnLogout} />);
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {
       expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
     });
@@ -90,7 +90,7 @@ describe("KanbanBoard", () => {
   });
 
   it("edits a card's title and details", async () => {
-    render(<KanbanBoard onLogout={mockOnLogout} />);
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {
       expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
     });
@@ -129,7 +129,7 @@ describe("KanbanBoard", () => {
   });
 
   it("cancels editing a card without saving changes", async () => {
-    render(<KanbanBoard onLogout={mockOnLogout} />);
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {
       expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
     });
@@ -159,20 +159,20 @@ describe("KanbanBoard", () => {
   });
 
   it("shows loading state initially", () => {
-    render(<KanbanBoard onLogout={mockOnLogout} />);
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     expect(screen.getByText("Loading your board...")).toBeInTheDocument();
   });
 
   it("shows error state on fetch failure", async () => {
     (fetchBoard as any).mockRejectedValue(new Error("Network error"));
-    render(<KanbanBoard onLogout={mockOnLogout} />);
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {
       expect(screen.getByText("Failed to load board")).toBeInTheDocument();
     });
   });
 
   it("switches to a newly created board", async () => {
-    render(<KanbanBoard onLogout={mockOnLogout} />);
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {
       expect(screen.getByText("My Board")).toBeInTheDocument();
     });
@@ -201,7 +201,7 @@ describe("KanbanBoard", () => {
       )
     );
 
-    render(<KanbanBoard onLogout={mockOnLogout} />);
+    render(<KanbanBoard username="testuser" onLogout={mockOnLogout} />);
     await waitFor(() => {
       expect(screen.getByText("My Board")).toBeInTheDocument();
     });

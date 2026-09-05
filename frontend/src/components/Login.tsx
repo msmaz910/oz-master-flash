@@ -2,26 +2,43 @@
 
 import { useState } from "react";
 import { BoardIcon, LogoutIcon } from "@/components/icons";
+import { login, register, setAuthToken } from "@/lib/api";
 
 interface LoginProps {
-  onLogin: (username: string, password: string) => boolean;
+  onAuthenticated: (username: string) => void;
 }
 
 const fieldClass =
   "w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white";
 
-export const Login = ({ onLogin }: LoginProps) => {
+export const Login = ({ onAuthenticated }: LoginProps) => {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (onLogin(username, password)) {
-      setError("");
-    } else {
-      setError("Invalid credentials");
+    setError("");
+    setSubmitting(true);
+    try {
+      const result =
+        mode === "signin"
+          ? await login(username, password)
+          : await register(username, password);
+      setAuthToken(result.token);
+      onAuthenticated(result.username);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const toggleMode = () => {
+    setMode((prev) => (prev === "signin" ? "signup" : "signin"));
+    setError("");
   };
 
   return (
@@ -39,7 +56,9 @@ export const Login = ({ onLogin }: LoginProps) => {
               Kanban Studio
             </h1>
             <p className="mt-2 text-sm text-[var(--gray-text)]">
-              Sign in to access your board
+              {mode === "signin"
+                ? "Sign in to access your boards"
+                : "Create an account to get started"}
             </p>
           </div>
 
@@ -58,6 +77,7 @@ export const Login = ({ onLogin }: LoginProps) => {
                 onChange={(e) => setUsername(e.target.value)}
                 className={fieldClass}
                 placeholder="Enter username"
+                autoComplete="username"
                 required
               />
             </div>
@@ -76,6 +96,8 @@ export const Login = ({ onLogin }: LoginProps) => {
                 onChange={(e) => setPassword(e.target.value)}
                 className={fieldClass}
                 placeholder="Enter password"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                minLength={mode === "signup" ? 6 : undefined}
                 required
               />
             </div>
@@ -88,16 +110,33 @@ export const Login = ({ onLogin }: LoginProps) => {
 
             <button
               type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--secondary-purple)] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110"
+              disabled={submitting}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--secondary-purple)] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <LogoutIcon className="h-4 w-4 rotate-180" />
-              Sign In
+              {submitting
+                ? "Please wait..."
+                : mode === "signin"
+                  ? "Sign In"
+                  : "Create Account"}
             </button>
           </form>
 
-          <div className="mt-6 rounded-xl bg-[var(--surface)] px-3 py-2 text-center text-xs text-[var(--gray-text)]">
-            Demo credentials: user / password
-          </div>
+          <button
+            type="button"
+            onClick={toggleMode}
+            className="mt-4 w-full text-center text-xs font-semibold text-[var(--secondary-purple)] transition hover:brightness-110"
+          >
+            {mode === "signin"
+              ? "Need an account? Sign up"
+              : "Already have an account? Sign in"}
+          </button>
+
+          {mode === "signin" && (
+            <div className="mt-6 rounded-xl bg-[var(--surface)] px-3 py-2 text-center text-xs text-[var(--gray-text)]">
+              Demo credentials: user / password
+            </div>
+          )}
         </div>
       </div>
     </div>

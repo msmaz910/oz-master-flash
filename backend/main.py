@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
@@ -12,7 +12,8 @@ from dotenv import load_dotenv
 # Load environment variables first
 load_dotenv()
 
-from models import get_db, init_db, empty_board_data, User, Board, Conversation
+from models import get_db, init_db, empty_board_data, User, Board, Conversation, UserSession
+from security import hash_password, verify_password, generate_token
 from ai_service import ai_service
 
 # Pydantic schemas
@@ -45,6 +46,14 @@ class ChatRequest(BaseModel):
     question: str
     boardId: int
 
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -66,12 +75,16 @@ async def test_ai(prompt: str = "What is 2+2?"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def get_default_user(db: Session) -> User:
-    # For MVP, all boards belong to the single default user "user"
-    user = db.query(User).filter(User.username == "user").first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+def get_current_user(
+    authorization: Optional[str] = Header(None), db: Session = Depends(get_db)
+) -> User:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.removeprefix("Bearer ").strip()
+    session = db.query(UserSession).filter(UserSession.token == token).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    return session.user
 
 def get_owned_board(db: Session, user: User, board_id: int) -> Board:
     board = db.query(Board).filter(Board.id == board_id, Board.user_id == user.id).first()
@@ -79,15 +92,66 @@ def get_owned_board(db: Session, user: User, board_id: int) -> Board:
         raise HTTPException(status_code=404, detail="Board not found")
     return board
 
+@app.post("/api/auth/register", status_code=201)
+async def register(request: RegisterRequest, db: Session = Depends(get_db)):
+    username = request.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username is required")
+    if len(request.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    existing = db.query(User).filter(User.username == username).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username is already taken")
+
+    user = User(username=username, password_hash=hash_password(request.password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    board = Board(user_id=user.id, name="My Board", data=empty_board_data())
+    db.add(board)
+
+    token = generate_token()
+    db.add(UserSession(token=token, user_id=user.id))
+    db.commit()
+
+    return {"token": token, "username": user.username}
+
+@app.post("/api/auth/login")
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == request.username.strip()).first()
+    if not user or not verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    token = generate_token()
+    db.add(UserSession(token=token, user_id=user.id))
+    db.commit()
+    return {"token": token, "username": user.username}
+
+@app.post("/api/auth/logout")
+async def logout(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.removeprefix("Bearer ").strip()
+        db.query(UserSession).filter(UserSession.token == token).delete()
+        db.commit()
+    return {"message": "Logged out"}
+
+@app.get("/api/auth/me")
+async def get_me(user: User = Depends(get_current_user)):
+    return {"username": user.username}
+
 @app.get("/api/boards")
-async def list_boards(db: Session = Depends(get_db)):
-    user = get_default_user(db)
+async def list_boards(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     boards = db.query(Board).filter(Board.user_id == user.id).order_by(Board.created_at).all()
     return [{"id": board.id, "name": board.name} for board in boards]
 
 @app.post("/api/boards", status_code=201)
-async def create_board(request: BoardCreateRequest, db: Session = Depends(get_db)):
-    user = get_default_user(db)
+async def create_board(
+    request: BoardCreateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     name = (request.name or "").strip() or "Untitled Board"
     board = Board(user_id=user.id, name=name, data=empty_board_data())
     db.add(board)
@@ -96,14 +160,19 @@ async def create_board(request: BoardCreateRequest, db: Session = Depends(get_db
     return {"id": board.id, "name": board.name, "board": board.data}
 
 @app.get("/api/boards/{board_id}")
-async def get_board(board_id: int, db: Session = Depends(get_db)):
-    user = get_default_user(db)
+async def get_board(
+    board_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     board = get_owned_board(db, user, board_id)
     return {"id": board.id, "name": board.name, "board": board.data}
 
 @app.put("/api/boards/{board_id}")
-async def update_board(board_id: int, request: BoardUpdateRequest, db: Session = Depends(get_db)):
-    user = get_default_user(db)
+async def update_board(
+    board_id: int,
+    request: BoardUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     board = get_owned_board(db, user, board_id)
 
     if request.board is not None:
@@ -120,8 +189,9 @@ async def update_board(board_id: int, request: BoardUpdateRequest, db: Session =
     return {"id": board.id, "name": board.name, "message": "Board updated"}
 
 @app.delete("/api/boards/{board_id}")
-async def delete_board(board_id: int, db: Session = Depends(get_db)):
-    user = get_default_user(db)
+async def delete_board(
+    board_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
     board = get_owned_board(db, user, board_id)
 
     remaining_boards = db.query(Board).filter(Board.user_id == user.id).count()
@@ -172,11 +242,14 @@ def validate_board_update(current_board: dict, updated_board: dict) -> tuple[boo
         return False, f"Validation error: {str(e)}"
 
 @app.post("/api/ai/chat")
-async def chat_with_ai(request: ChatRequest, db: Session = Depends(get_db)):
+async def chat_with_ai(
+    request: ChatRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Chat with AI about the kanban board."""
     try:
-        # Get user and board
-        user = get_default_user(db)
+        # Get board owned by the authenticated user
         board = get_owned_board(db, user, request.boardId)
 
         # Parse current board state

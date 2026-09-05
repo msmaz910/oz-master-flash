@@ -3,33 +3,58 @@
 import { useState, useEffect } from "react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { Login } from "@/components/Login";
+import { clearAuthToken, fetchCurrentUser, getAuthToken, logout } from "@/lib/api";
+
+type AuthState = "checking" | "authenticated" | "unauthenticated";
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authState, setAuthState] = useState<AuthState>("checking");
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user is logged in on mount
-    const loggedIn = localStorage.getItem("kanban-auth") === "true";
-    setIsLoggedIn(loggedIn);
+    const checkSession = async () => {
+      if (!getAuthToken()) {
+        setAuthState("unauthenticated");
+        return;
+      }
+      try {
+        const me = await fetchCurrentUser();
+        setUsername(me.username);
+        setAuthState("authenticated");
+      } catch {
+        clearAuthToken();
+        setAuthState("unauthenticated");
+      }
+    };
+    checkSession();
   }, []);
 
-  const handleLogin = (username: string, password: string): boolean => {
-    if (username === "user" && password === "password") {
-      localStorage.setItem("kanban-auth", "true");
-      setIsLoggedIn(true);
-      return true;
+  const handleAuthenticated = (name: string) => {
+    setUsername(name);
+    setAuthState("authenticated");
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      clearAuthToken();
+      setUsername(null);
+      setAuthState("unauthenticated");
     }
-    return false;
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("kanban-auth");
-    setIsLoggedIn(false);
-  };
-
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
+  if (authState === "checking") {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--primary-blue)] border-t-transparent" />
+      </div>
+    );
   }
 
-  return <KanbanBoard onLogout={handleLogout} />;
+  if (authState === "unauthenticated") {
+    return <Login onAuthenticated={handleAuthenticated} />;
+  }
+
+  return <KanbanBoard username={username} onLogout={handleLogout} />;
 }

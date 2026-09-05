@@ -1,7 +1,15 @@
+import pytest
 from fastapi.testclient import TestClient
 from main import app
 
 client = TestClient(app)
+
+@pytest.fixture(scope="module")
+def auth_headers():
+    response = client.post("/api/auth/login", json={"username": "user", "password": "password"})
+    assert response.status_code == 200
+    token = response.json()["token"]
+    return {"Authorization": f"Bearer {token}"}
 
 def test_read_main():
     response = client.get("/")
@@ -15,21 +23,82 @@ def test_api_hello():
     assert response.status_code == 200
     assert response.json() == {"message": "Hello from FastAPI backend!"}
 
-def _first_board_id():
-    boards = client.get("/api/boards").json()
+# --- Auth ---
+
+def test_login_with_wrong_password_fails():
+    response = client.post("/api/auth/login", json={"username": "user", "password": "wrong"})
+    assert response.status_code == 401
+
+def test_login_with_unknown_username_fails():
+    response = client.post("/api/auth/login", json={"username": "nobody", "password": "password"})
+    assert response.status_code == 401
+
+def test_register_creates_user_with_own_board(auth_headers):
+    response = client.post(
+        "/api/auth/register", json={"username": "alice", "password": "hunter22"}
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["username"] == "alice"
+    assert "token" in data
+
+    alice_headers = {"Authorization": f"Bearer {data['token']}"}
+    alice_boards = client.get("/api/boards", headers=alice_headers).json()
+    assert len(alice_boards) == 1
+    assert alice_boards[0]["name"] == "My Board"
+
+    # Alice's board list is isolated from the default user's boards
+    default_user_boards = client.get("/api/boards", headers=auth_headers).json()
+    assert alice_boards[0]["id"] not in [b["id"] for b in default_user_boards]
+
+def test_register_duplicate_username_fails():
+    client.post("/api/auth/register", json={"username": "bob", "password": "password1"})
+    response = client.post("/api/auth/register", json={"username": "bob", "password": "password2"})
+    assert response.status_code == 400
+
+def test_register_short_password_fails():
+    response = client.post("/api/auth/register", json={"username": "shortpw", "password": "abc"})
+    assert response.status_code == 400
+
+def test_me_requires_auth():
+    response = client.get("/api/auth/me")
+    assert response.status_code == 401
+
+def test_me_returns_current_user(auth_headers):
+    response = client.get("/api/auth/me", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json()["username"] == "user"
+
+def test_logout_invalidates_session():
+    login_response = client.post("/api/auth/login", json={"username": "user", "password": "password"})
+    token = login_response.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert client.get("/api/auth/me", headers=headers).status_code == 200
+    assert client.post("/api/auth/logout", headers=headers).status_code == 200
+    assert client.get("/api/auth/me", headers=headers).status_code == 401
+
+# --- Boards (require auth) ---
+
+def test_boards_require_auth():
+    assert client.get("/api/boards").status_code == 401
+    assert client.post("/api/boards", json={"name": "X"}).status_code == 401
+
+def _first_board_id(auth_headers):
+    boards = client.get("/api/boards", headers=auth_headers).json()
     return boards[0]["id"]
 
-def test_list_boards():
-    response = client.get("/api/boards")
+def test_list_boards(auth_headers):
+    response = client.get("/api/boards", headers=auth_headers)
     assert response.status_code == 200
     boards = response.json()
     assert len(boards) >= 1
     assert "id" in boards[0]
     assert "name" in boards[0]
 
-def test_get_board():
-    board_id = _first_board_id()
-    response = client.get(f"/api/boards/{board_id}")
+def test_get_board(auth_headers):
+    board_id = _first_board_id(auth_headers)
+    response = client.get(f"/api/boards/{board_id}", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert "board" in data
@@ -41,15 +110,15 @@ def test_get_board():
     assert "cards" in board
     assert len(board["columns"]) == 5
 
-def test_get_board_not_found():
-    response = client.get("/api/boards/999999")
+def test_get_board_not_found(auth_headers):
+    response = client.get("/api/boards/999999", headers=auth_headers)
     assert response.status_code == 404
 
-def test_update_board():
-    board_id = _first_board_id()
+def test_update_board(auth_headers):
+    board_id = _first_board_id(auth_headers)
 
     # First get current board
-    response = client.get(f"/api/boards/{board_id}")
+    response = client.get(f"/api/boards/{board_id}", headers=auth_headers)
     current_data = response.json()
 
     # Modify it (add a card)
@@ -59,19 +128,23 @@ def test_update_board():
     board["columns"][0]["cardIds"].append("test-card")
 
     # Update
-    update_response = client.put(f"/api/boards/{board_id}", json={"board": board})
+    update_response = client.put(
+        f"/api/boards/{board_id}", json={"board": board}, headers=auth_headers
+    )
     assert update_response.status_code == 200
     assert update_response.json()["message"] == "Board updated"
 
     # Verify
-    get_response = client.get(f"/api/boards/{board_id}")
+    get_response = client.get(f"/api/boards/{board_id}", headers=auth_headers)
     new_data = get_response.json()
     new_board = json.loads(new_data["board"])
     assert "test-card" in new_board["cards"]
 
-def test_create_list_rename_delete_board():
+def test_create_list_rename_delete_board(auth_headers):
     # Create a second board
-    create_response = client.post("/api/boards", json={"name": "Marketing"})
+    create_response = client.post(
+        "/api/boards", json={"name": "Marketing"}, headers=auth_headers
+    )
     assert create_response.status_code == 201
     created = create_response.json()
     assert created["name"] == "Marketing"
@@ -83,35 +156,38 @@ def test_create_list_rename_delete_board():
     assert len(empty_board["columns"]) == 5
 
     # It shows up in the list
-    boards = client.get("/api/boards").json()
+    boards = client.get("/api/boards", headers=auth_headers).json()
     assert any(b["id"] == new_board_id for b in boards)
 
     # Rename it
-    rename_response = client.put(f"/api/boards/{new_board_id}", json={"name": "Renamed"})
+    rename_response = client.put(
+        f"/api/boards/{new_board_id}", json={"name": "Renamed"}, headers=auth_headers
+    )
     assert rename_response.status_code == 200
     assert rename_response.json()["name"] == "Renamed"
 
     # Delete it
-    delete_response = client.delete(f"/api/boards/{new_board_id}")
+    delete_response = client.delete(f"/api/boards/{new_board_id}", headers=auth_headers)
     assert delete_response.status_code == 200
 
-    boards_after = client.get("/api/boards").json()
+    boards_after = client.get("/api/boards", headers=auth_headers).json()
     assert not any(b["id"] == new_board_id for b in boards_after)
 
-def test_cannot_delete_only_board():
-    boards = client.get("/api/boards").json()
+def test_cannot_delete_only_board(auth_headers):
+    boards = client.get("/api/boards", headers=auth_headers).json()
     assert len(boards) == 1
-    response = client.delete(f"/api/boards/{boards[0]['id']}")
+    response = client.delete(f"/api/boards/{boards[0]['id']}", headers=auth_headers)
     assert response.status_code == 400
+
 def test_validate_board_update():
     """Test board update validation."""
     from main import validate_board_update
-    
+
     current = {
         "columns": [{"id": "col-1", "title": "Col", "cardIds": []}],
         "cards": {}
     }
-    
+
     # Valid update - same structure
     valid_update = {
         "columns": [{"id": "col-1", "title": "Col", "cardIds": ["card-1"]}],
@@ -119,7 +195,7 @@ def test_validate_board_update():
     }
     is_valid, msg = validate_board_update(current, valid_update)
     assert is_valid, msg
-    
+
     # Invalid - unknown column ID
     invalid_update = {
         "columns": [{"id": "col-unknown", "title": "Col", "cardIds": []}],
@@ -128,7 +204,7 @@ def test_validate_board_update():
     is_valid, msg = validate_board_update(current, invalid_update)
     assert not is_valid
     assert "Invalid column ID" in msg
-    
+
     # Invalid - card referenced but not in cards
     invalid_update = {
         "columns": [{"id": "col-1", "title": "Col", "cardIds": ["card-missing"]}],
