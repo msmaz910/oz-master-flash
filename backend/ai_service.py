@@ -103,6 +103,6 @@ Respond with ONLY the JSON object - no other text, no markdown code fences."""
 
         except Exception as e:
             raise self._wrap_api_error(e)
-
+          
 # Global instance
 ai_service = AIService()
