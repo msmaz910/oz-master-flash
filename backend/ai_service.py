@@ -1,34 +1,51 @@
 import os
-import openai
+import anthropic
 import json
-from typing import Optional
+
+MODEL = "claude-sonnet-5"
+
 
 class AIService:
     def __init__(self):
-        self.api_key = os.getenv("OPENROUTER_API_KEY")
+        self.api_key = os.getenv("ANTHROPIC_API_KEY")
         self.client = None
         if self.api_key:
-            self.client = openai.AsyncOpenAI(
-                api_key=self.api_key,
-                base_url="https://openrouter.ai/api/v1"
-            )
+            self.client = anthropic.AsyncAnthropic(api_key=self.api_key)
+
+    @staticmethod
+    def _extract_text(response) -> str:
+        for block in response.content:
+            if block.type == "text":
+                return block.text.strip()
+        raise Exception("The model returned no text content. Please try again.")
+
+    @staticmethod
+    def _wrap_api_error(e: Exception) -> Exception:
+        if isinstance(e, anthropic.AuthenticationError):
+            return Exception("AI service error: invalid Anthropic API key")
+        if isinstance(e, anthropic.RateLimitError):
+            return Exception("AI service error: rate limited by Anthropic, please try again shortly")
+        if isinstance(e, anthropic.APIStatusError):
+            return Exception(f"AI service error: {e.message}")
+        if isinstance(e, anthropic.APIConnectionError):
+            return Exception("AI service error: could not reach Anthropic API")
+        return Exception(f"AI service error: {str(e)}")
 
     async def test_connection(self, prompt: str = "What is 2+2?") -> str:
         """Test the AI connection with a simple prompt."""
         if not self.client:
-            raise Exception("OPENROUTER_API_KEY is not configured")
+            raise Exception("ANTHROPIC_API_KEY is not configured")
         try:
-            response = await self.client.chat.completions.create(
-                model="openai/gpt-oss-120b:free",
+            response = await self.client.messages.create(
+                model=MODEL,
+                max_tokens=100,
                 messages=[
                     {"role": "user", "content": prompt}
-                ],
-                max_tokens=100,
-                temperature=0.1
+                ]
             )
-            return response.choices[0].message.content.strip()
+            return self._extract_text(response)
         except Exception as e:
-            raise Exception(f"AI service error: {str(e)}")
+            raise self._wrap_api_error(e)
 
     async def chat_with_kanban(
         self,
@@ -50,7 +67,7 @@ class AIService:
             }
         """
         if not self.client:
-            raise Exception("OPENROUTER_API_KEY is not configured")
+            raise Exception("ANTHROPIC_API_KEY is not configured")
         try:
             system_prompt = """You are a helpful kanban board assistant. When the user asks you to modify the board,
 respond with a JSON object containing:
@@ -63,28 +80,21 @@ The board structure is:
   "cards": {cardId: {"id": string, "title": string, "details": string}}
 }
 
-Always respond with valid JSON. Only modify the board if the user explicitly asks for changes."""
+Respond with ONLY the JSON object - no other text, no markdown code fences."""
 
             board_context = f"Current board state:\n{json.dumps(board_state)}"
 
-            messages = [
-                {"role": "system", "content": f"{system_prompt}\n\n{board_context}"}
-            ]
-
-            for msg in conversation_history:
-                messages.append(msg)
-
+            messages = list(conversation_history)
             messages.append({"role": "user", "content": user_question})
 
-            response = await self.client.chat.completions.create(
-                model="openai/gpt-oss-120b:free",
-                messages=messages,
+            response = await self.client.messages.create(
+                model=MODEL,
                 max_tokens=2000,
-                temperature=0.7,
-                response_format={"type": "json_object"}
+                system=f"{system_prompt}\n\n{board_context}",
+                messages=messages,
             )
 
-            content = response.choices[0].message.content.strip()
+            content = self._extract_text(response)
 
             try:
                 return json.loads(content)
@@ -92,7 +102,7 @@ Always respond with valid JSON. Only modify the board if the user explicitly ask
                 return {"response": content}
 
         except Exception as e:
-            raise Exception(f"AI service error: {str(e)}")
+            raise self._wrap_api_error(e)
 
 # Global instance
 ai_service = AIService()

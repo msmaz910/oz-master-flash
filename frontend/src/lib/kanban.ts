@@ -42,12 +42,12 @@ export const normalizeLabels = (input: string): string[] => {
 type LabelColor = { bg: string; text: string };
 
 const LABEL_PALETTE: LabelColor[] = [
-  { bg: "bg-blue-100", text: "text-blue-700" },
-  { bg: "bg-purple-100", text: "text-purple-700" },
-  { bg: "bg-teal-100", text: "text-teal-700" },
-  { bg: "bg-pink-100", text: "text-pink-700" },
+  { bg: "bg-emerald-100", text: "text-emerald-700" },
+  { bg: "bg-amber-100", text: "text-amber-700" },
   { bg: "bg-orange-100", text: "text-orange-700" },
-  { bg: "bg-green-100", text: "text-green-700" },
+  { bg: "bg-teal-100", text: "text-teal-700" },
+  { bg: "bg-stone-200", text: "text-stone-700" },
+  { bg: "bg-lime-100", text: "text-lime-700" },
 ];
 
 export const labelColorFor = (label: string): LabelColor => {

@@ -96,7 +96,7 @@ export const BoardSwitcher = ({
       {isOpen && (
         <div
           role="listbox"
-          className="absolute left-0 top-[calc(100%+8px)] z-20 w-72 rounded-2xl border border-[var(--stroke)] bg-white p-2 shadow-[0_20px_40px_rgba(3,33,71,0.16)]"
+          className="absolute left-0 top-[calc(100%+8px)] z-20 w-72 rounded-2xl border border-[var(--stroke)] bg-white p-2 shadow-[0_20px_40px_rgba(36,31,24,0.16)]"
         >
           <ul className="max-h-64 space-y-0.5 overflow-y-auto">
             {boards.map((board) => (

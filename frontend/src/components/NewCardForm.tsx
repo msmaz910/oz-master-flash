@@ -64,7 +64,7 @@ export const NewCardForm = ({ accent, onAdd }: NewCardFormProps) => {
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-2 rounded-2xl border border-[var(--stroke)] bg-white p-2.5 shadow-[0_10px_24px_rgba(3,33,71,0.08)]"
+      className="space-y-2 rounded-2xl border border-[var(--stroke)] bg-white p-2.5 shadow-[0_10px_24px_rgba(36,31,24,0.08)]"
     >
       <input
         value={formState.title}

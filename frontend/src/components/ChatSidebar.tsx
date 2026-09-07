@@ -135,7 +135,7 @@ export const ChatSidebar = ({
             >
               <div
                 className={clsx(
-                  "max-w-[88%] whitespace-pre-wrap px-3.5 py-2.5 text-[13px] leading-6 shadow-[0_4px_12px_rgba(3,33,71,0.06)]",
+                  "max-w-[88%] whitespace-pre-wrap px-3.5 py-2.5 text-[13px] leading-6 shadow-[0_4px_12px_rgba(36,31,24,0.06)]",
                   message.role === "user"
                     ? "rounded-2xl rounded-br-md bg-[var(--primary-blue)] text-white"
                     : "rounded-2xl rounded-bl-md border border-[var(--stroke)] bg-white text-[var(--navy-dark)]"

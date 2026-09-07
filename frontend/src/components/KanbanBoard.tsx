@@ -50,7 +50,7 @@ import {
 } from "@/lib/api";
 
 // Hex (not CSS vars) so accents can be composed with alpha suffixes for glows.
-const COLUMN_ACCENTS = ["#209dd7", "#753991", "#ecad0a", "#0ea5a4", "#ef6f5c"];
+const COLUMN_ACCENTS = ["#2f5d44", "#b5532c", "#d9a441", "#3c7a89", "#d9663a"];
 
 const accentFor = (index: number) => COLUMN_ACCENTS[index % COLUMN_ACCENTS.length];
 
@@ -63,7 +63,7 @@ const toolbarButtonIdle =
   "border-[var(--stroke)] bg-white/70 text-[var(--gray-text)] hover:border-[var(--stroke-strong)] hover:bg-white hover:text-[var(--navy-dark)]";
 
 const toolbarButtonActive =
-  "border-transparent bg-[var(--secondary-purple)] text-white shadow-[0_8px_18px_rgba(117,57,145,0.28)] hover:brightness-110";
+  "border-transparent bg-[var(--secondary-purple)] text-white shadow-[0_8px_18px_rgba(181,83,44,0.28)] hover:brightness-110";
 
 const lastBoardStorageKey = (username: string | null) => `pm-last-board-id:${username ?? "guest"}`;
 
@@ -433,13 +433,13 @@ export const KanbanBoard = ({
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden">
-      <div className="pointer-events-none absolute left-0 top-0 h-[420px] w-[420px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-[radial-gradient(circle,_rgba(32,157,215,0.22)_0%,_rgba(32,157,215,0.05)_55%,_transparent_70%)]" />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-[520px] w-[520px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,_rgba(117,57,145,0.16)_0%,_rgba(117,57,145,0.05)_55%,_transparent_75%)]" />
+      <div className="pointer-events-none absolute left-0 top-0 h-[420px] w-[420px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-[radial-gradient(circle,_rgba(47,93,68,0.22)_0%,_rgba(47,93,68,0.05)_55%,_transparent_70%)]" />
+      <div className="pointer-events-none absolute bottom-0 right-0 h-[520px] w-[520px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,_rgba(181,83,44,0.16)_0%,_rgba(181,83,44,0.05)_55%,_transparent_75%)]" />
 
       <header className="relative z-20 shrink-0 border-b border-[var(--stroke)] bg-white/70 backdrop-blur">
         <div className="flex h-16 items-center gap-4 px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--primary-blue),var(--secondary-purple))] text-white shadow-[0_8px_18px_rgba(32,157,215,0.35)]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[linear-gradient(135deg,var(--primary-blue),var(--secondary-purple))] text-white shadow-[0_8px_18px_rgba(47,93,68,0.35)]">
               <BoardIcon className="h-5 w-5" />
             </span>
             <div className="min-w-0">

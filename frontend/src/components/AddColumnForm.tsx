@@ -35,7 +35,7 @@ export const AddColumnForm = ({ onAdd }: AddColumnFormProps) => {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex h-fit shrink-0 items-center gap-1.5 self-start rounded-2xl border border-[var(--stroke)] bg-white p-2 shadow-[0_10px_24px_rgba(3,33,71,0.08)]"
+      className="flex h-fit shrink-0 items-center gap-1.5 self-start rounded-2xl border border-[var(--stroke)] bg-white p-2 shadow-[0_10px_24px_rgba(36,31,24,0.08)]"
       style={{ minWidth: "clamp(190px, 24cqw, 300px)" }}
     >
       <input

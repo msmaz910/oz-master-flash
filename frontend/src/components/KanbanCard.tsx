@@ -23,7 +23,7 @@ import {
 import { CardComments } from "@/components/CardComments";
 
 const PRIORITY_STYLES: Record<Priority, string> = {
-  low: "bg-slate-100 text-slate-600",
+  low: "bg-stone-100 text-stone-600",
   medium: "bg-amber-100 text-amber-700",
   high: "bg-red-100 text-red-600",
 };
@@ -151,7 +151,7 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
         style={style}
         onSubmit={handleSubmit}
         onPointerDown={(event) => event.stopPropagation()}
-        className="space-y-2 rounded-2xl border border-[var(--stroke)] bg-white p-2.5 shadow-[0_10px_24px_rgba(3,33,71,0.08)]"
+        className="space-y-2 rounded-2xl border border-[var(--stroke)] bg-white p-2.5 shadow-[0_10px_24px_rgba(36,31,24,0.08)]"
         data-testid={`card-${card.id}`}
       >
         <input
@@ -242,9 +242,9 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
       style={style}
       className={clsx(
         "group relative cursor-grab rounded-2xl border border-[var(--stroke)] bg-white px-4 py-3.5",
-        "shadow-[0_6px_16px_rgba(3,33,71,0.06)] transition-all duration-150",
-        "hover:-translate-y-0.5 hover:border-[var(--stroke-strong)] hover:shadow-[0_14px_28px_rgba(3,33,71,0.12)]",
-        isDragging && "cursor-grabbing opacity-50 shadow-[0_18px_32px_rgba(3,33,71,0.16)]"
+        "shadow-[0_6px_16px_rgba(36,31,24,0.06)] transition-all duration-150",
+        "hover:-translate-y-0.5 hover:border-[var(--stroke-strong)] hover:shadow-[0_14px_28px_rgba(36,31,24,0.12)]",
+        isDragging && "cursor-grabbing opacity-50 shadow-[0_18px_32px_rgba(36,31,24,0.16)]"
       )}
       {...attributes}
       {...listeners}

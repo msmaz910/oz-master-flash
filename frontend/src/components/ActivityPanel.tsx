@@ -25,7 +25,7 @@ export const ActivityPanel = ({ entries, onClose }: ActivityPanelProps) => {
       ref={containerRef}
       role="dialog"
       aria-label="Board activity"
-      className="absolute right-0 top-[calc(100%+8px)] z-20 w-80 rounded-2xl border border-[var(--stroke)] bg-white p-3 shadow-[0_20px_40px_rgba(3,33,71,0.16)]"
+      className="absolute right-0 top-[calc(100%+8px)] z-20 w-80 rounded-2xl border border-[var(--stroke)] bg-white p-3 shadow-[0_20px_40px_rgba(36,31,24,0.16)]"
     >
       <div className="mb-2 flex items-center justify-between">
         <h2 className="font-display text-sm font-semibold text-[var(--navy-dark)]">
