@@ -32,6 +32,7 @@ import {
   initialData,
   moveCardInBoard,
   cardMatchesFilters,
+  columnContainingCard,
   appendActivity,
   EMPTY_FILTERS,
   type BoardData,
@@ -67,6 +68,17 @@ const toolbarButtonActive =
 
 const lastBoardStorageKey = (username: string | null) => `pm-last-board-id:${username ?? "guest"}`;
 
+const readLastBoardId = (username: string | null): number | null => {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(lastBoardStorageKey(username));
+  return stored === null ? null : Number(stored);
+};
+
+const rememberLastBoardId = (username: string | null, boardId: number) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(lastBoardStorageKey(username), String(boardId));
+};
+
 export const KanbanBoard = ({
   username,
   onLogout,
@@ -87,9 +99,9 @@ export const KanbanBoard = ({
   const [isActivityOpen, setIsActivityOpen] = useState(false);
 
   const actor = username ?? "Unknown";
-  const logActivity = (b: BoardData, message: string): BoardData => ({
-    ...b,
-    activity: appendActivity(b.activity, message, actor),
+  const logActivity = (nextBoard: BoardData, message: string): BoardData => ({
+    ...nextBoard,
+    activity: appendActivity(nextBoard.activity, message, actor),
   });
 
   useEffect(() => {
@@ -98,9 +110,7 @@ export const KanbanBoard = ({
         const boardList = await listBoards();
         setBoards(boardList);
 
-        const storedId = Number(
-          typeof window !== "undefined" ? window.localStorage.getItem(lastBoardStorageKey(username)) : null
-        );
+        const storedId = readLastBoardId(username);
         const initialId =
           boardList.find((b) => b.id === storedId)?.id ?? boardList[0]?.id ?? null;
 
@@ -111,9 +121,7 @@ export const KanbanBoard = ({
         const data = await fetchBoard(initialId);
         setCurrentBoardId(initialId);
         setBoard(data);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(lastBoardStorageKey(username), String(initialId));
-        }
+        rememberLastBoardId(username, initialId);
       } catch (err) {
         setLoadError("Failed to load board");
         console.error(err);
@@ -135,6 +143,12 @@ export const KanbanBoard = ({
     }
   };
 
+  // Every board mutation follows the same shape: show the new board, then persist it.
+  const commitBoard = (nextBoard: BoardData) => {
+    setBoard(nextBoard);
+    syncBoard(nextBoard);
+  };
+
   const refreshBoard = async () => {
     if (currentBoardId === null) return;
     setIsRefreshing(true);
@@ -152,9 +166,7 @@ export const KanbanBoard = ({
 
   const switchToBoard = async (boardId: number) => {
     setCurrentBoardId(boardId);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(lastBoardStorageKey(username), String(boardId));
-    }
+    rememberLastBoardId(username, boardId);
     setLoading(true);
     try {
       const data = await fetchBoard(boardId);
@@ -174,9 +186,7 @@ export const KanbanBoard = ({
       setBoards((prev) => [...prev, { id: created.id, name: created.name }]);
       setCurrentBoardId(created.id);
       setBoard(created.board);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(lastBoardStorageKey(username), String(created.id));
-      }
+      rememberLastBoardId(username, created.id);
     } catch (err) {
       setSyncError("Failed to create board");
       console.error(err);
@@ -225,22 +235,24 @@ export const KanbanBoard = ({
       return;
     }
 
-    const result = moveCardInBoard(board, active.id as string, over.id as string);
-    if (result) {
-      const movedCard = board.cards[active.id as string];
-      const sourceColumnId = board.columns.find((column) =>
-        column.cardIds.includes(active.id as string)
-      )?.id;
-      const targetColumn = result.columns.find((column) =>
-        column.cardIds.includes(active.id as string)
-      );
-      const logged =
-        movedCard && targetColumn && targetColumn.id !== sourceColumnId
-          ? logActivity(result, `${actor} moved "${movedCard.title}" to ${targetColumn.title}`)
-          : result;
-      setBoard(logged);
-      syncBoard(logged);
+    const cardId = active.id as string;
+    const result = moveCardInBoard(board, cardId, over.id as string);
+    if (!result) {
+      return;
     }
+
+    // Reordering inside a column is deliberately not logged — only moves
+    // that land the card in a different column are.
+    const movedCard = board.cards[cardId];
+    const sourceColumnId = columnContainingCard(board.columns, cardId)?.id;
+    const targetColumn = columnContainingCard(result.columns, cardId);
+    const changedColumn = movedCard && targetColumn && targetColumn.id !== sourceColumnId;
+
+    commitBoard(
+      changedColumn
+        ? logActivity(result, `${actor} moved "${movedCard.title}" to ${targetColumn.title}`)
+        : result
+    );
   };
 
   const handleRenameColumn = (columnId: string, title: string) => {
@@ -259,12 +271,12 @@ export const KanbanBoard = ({
 
   const handleAddColumn = (title: string) => {
     const newColumn = { id: createId("col"), title, cardIds: [] };
-    const newBoard = logActivity(
-      { ...board, columns: [...board.columns, newColumn] },
-      `${actor} added column "${title}"`
+    commitBoard(
+      logActivity(
+        { ...board, columns: [...board.columns, newColumn] },
+        `${actor} added column "${title}"`
+      )
     );
-    setBoard(newBoard);
-    syncBoard(newBoard);
   };
 
   const handleDeleteColumn = (columnId: string) => {
@@ -272,12 +284,12 @@ export const KanbanBoard = ({
     if (!column || column.cardIds.length > 0 || board.columns.length <= 1) {
       return;
     }
-    const newBoard = logActivity(
-      { ...board, columns: board.columns.filter((c) => c.id !== columnId) },
-      `${actor} deleted column "${column.title}"`
+    commitBoard(
+      logActivity(
+        { ...board, columns: board.columns.filter((c) => c.id !== columnId) },
+        `${actor} deleted column "${column.title}"`
+      )
     );
-    setBoard(newBoard);
-    syncBoard(newBoard);
   };
 
   const handleAddCard = (
@@ -289,46 +301,43 @@ export const KanbanBoard = ({
     labels?: string[]
   ) => {
     const id = createId("card");
-    const newBoard = logActivity(
-      {
-        ...board,
-        cards: {
-          ...board.cards,
-          [id]: { id, title, details: details || "No details yet.", dueDate, priority, labels },
+    commitBoard(
+      logActivity(
+        {
+          ...board,
+          cards: {
+            ...board.cards,
+            [id]: { id, title, details: details || "No details yet.", dueDate, priority, labels },
+          },
+          columns: board.columns.map((column) =>
+            column.id === columnId
+              ? { ...column, cardIds: [...column.cardIds, id] }
+              : column
+          ),
         },
-        columns: board.columns.map((column) =>
-          column.id === columnId
-            ? { ...column, cardIds: [...column.cardIds, id] }
-            : column
-        ),
-      },
-      `${actor} added "${title}"`
+        `${actor} added "${title}"`
+      )
     );
-    setBoard(newBoard);
-    syncBoard(newBoard);
   };
 
   const handleDeleteCard = (columnId: string, cardId: string) => {
     const deletedTitle = board.cards[cardId]?.title ?? "a card";
-    const newBoard = logActivity(
-      {
-        ...board,
-        cards: Object.fromEntries(
-          Object.entries(board.cards).filter(([id]) => id !== cardId)
-        ),
-        columns: board.columns.map((column) =>
-          column.id === columnId
-            ? {
-                ...column,
-                cardIds: column.cardIds.filter((id) => id !== cardId),
-              }
-            : column
-        ),
-      },
-      `${actor} deleted "${deletedTitle}"`
+    commitBoard(
+      logActivity(
+        {
+          ...board,
+          cards: Object.fromEntries(
+            Object.entries(board.cards).filter(([id]) => id !== cardId)
+          ),
+          columns: board.columns.map((column) =>
+            column.id === columnId
+              ? { ...column, cardIds: column.cardIds.filter((id) => id !== cardId) }
+              : column
+          ),
+        },
+        `${actor} deleted "${deletedTitle}"`
+      )
     );
-    setBoard(newBoard);
-    syncBoard(newBoard);
   };
 
   const handleEditCard = (
@@ -339,18 +348,18 @@ export const KanbanBoard = ({
     priority?: Priority,
     labels?: string[]
   ) => {
-    const newBoard = logActivity(
-      {
-        ...board,
-        cards: {
-          ...board.cards,
-          [cardId]: { ...board.cards[cardId], title, details, dueDate, priority, labels },
+    commitBoard(
+      logActivity(
+        {
+          ...board,
+          cards: {
+            ...board.cards,
+            [cardId]: { ...board.cards[cardId], title, details, dueDate, priority, labels },
+          },
         },
-      },
-      `${actor} edited "${title}"`
+        `${actor} edited "${title}"`
+      )
     );
-    setBoard(newBoard);
-    syncBoard(newBoard);
   };
 
   const handleAddComment = (cardId: string, text: string) => {
@@ -361,21 +370,21 @@ export const KanbanBoard = ({
       text,
       createdAt: new Date().toISOString(),
     };
-    const newBoard = logActivity(
-      {
-        ...board,
-        cards: {
-          ...board.cards,
-          [cardId]: {
-            ...existingCard,
-            comments: [...(existingCard.comments ?? []), comment],
+    commitBoard(
+      logActivity(
+        {
+          ...board,
+          cards: {
+            ...board.cards,
+            [cardId]: {
+              ...existingCard,
+              comments: [...(existingCard.comments ?? []), comment],
+            },
           },
         },
-      },
-      `${actor} commented on "${existingCard.title}"`
+        `${actor} commented on "${existingCard.title}"`
+      )
     );
-    setBoard(newBoard);
-    syncBoard(newBoard);
   };
 
   const activeCard = activeCardId ? board.cards[activeCardId] : null;

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
 import clsx from "clsx";
 import type { BoardSummary } from "@/lib/api";
+import { useClickOutside } from "@/lib/useClickOutside";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -36,18 +37,13 @@ export const BoardSwitcher = ({
 
   const currentBoard = boards.find((board) => board.id === currentBoardId);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        setIsCreating(false);
-        setRenamingId(null);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
+  const closeMenu = useCallback(() => {
+    setIsOpen(false);
+    setIsCreating(false);
+    setRenamingId(null);
+  }, []);
+
+  useClickOutside(containerRef, closeMenu, isOpen);
 
   const startRenaming = (board: BoardSummary) => {
     setRenamingId(board.id);

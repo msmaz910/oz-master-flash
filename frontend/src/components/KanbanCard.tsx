@@ -5,8 +5,6 @@ import clsx from "clsx";
 import {
   isOverdue,
   labelColorFor,
-  normalizeLabels,
-  PRIORITIES,
   PRIORITY_LABELS,
   type Card,
   type Priority,
@@ -21,6 +19,11 @@ import {
   TrashIcon,
 } from "@/components/icons";
 import { CardComments } from "@/components/CardComments";
+import {
+  CardFormFields,
+  cardFormStateFrom,
+  toCardValues,
+} from "@/components/CardFormFields";
 
 const PRIORITY_STYLES: Record<Priority, string> = {
   low: "bg-stone-100 text-stone-600",
@@ -98,13 +101,7 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
 
   const [isEditing, setIsEditing] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
-  const [formState, setFormState] = useState({
-    title: card.title,
-    details: card.details,
-    dueDate: card.dueDate ?? "",
-    priority: card.priority ?? ("" as Priority | ""),
-    labels: (card.labels ?? []).join(", "),
-  });
+  const [formState, setFormState] = useState(() => cardFormStateFrom(card));
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -112,35 +109,17 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
   };
 
   const startEditing = () => {
-    setFormState({
-      title: card.title,
-      details: card.details,
-      dueDate: card.dueDate ?? "",
-      priority: card.priority ?? "",
-      labels: (card.labels ?? []).join(", "),
-    });
+    setFormState(cardFormStateFrom(card));
     setIsEditing(true);
-  };
-
-  const cancelEditing = () => {
-    setIsEditing(false);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const title = formState.title.trim();
-    if (!title) {
+    const values = toCardValues(formState);
+    if (!values) {
       return;
     }
-    const labels = normalizeLabels(formState.labels);
-    onEdit(
-      card.id,
-      title,
-      formState.details.trim(),
-      formState.dueDate || undefined,
-      formState.priority || undefined,
-      labels.length > 0 ? labels : undefined
-    );
+    onEdit(card.id, values.title, values.details, values.dueDate, values.priority, values.labels);
     setIsEditing(false);
   };
 
@@ -154,64 +133,11 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
         className="space-y-2 rounded-2xl border border-[var(--stroke)] bg-white p-2.5 shadow-[0_10px_24px_rgba(36,31,24,0.08)]"
         data-testid={`card-${card.id}`}
       >
-        <input
-          value={formState.title}
-          onChange={(event) =>
-            setFormState((prev) => ({ ...prev, title: event.target.value }))
-          }
-          placeholder="Card title"
-          autoFocus
-          className="w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-sm font-medium text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
-          aria-label="Card title"
-          required
-        />
-        <textarea
-          value={formState.details}
-          onChange={(event) =>
-            setFormState((prev) => ({ ...prev, details: event.target.value }))
-          }
-          placeholder="Details"
-          rows={2}
-          className="w-full resize-none rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
-          aria-label="Card details"
-        />
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={formState.dueDate}
-            onChange={(event) =>
-              setFormState((prev) => ({ ...prev, dueDate: event.target.value }))
-            }
-            aria-label="Due date"
-            className="flex-1 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
-          />
-          <select
-            value={formState.priority}
-            onChange={(event) =>
-              setFormState((prev) => ({
-                ...prev,
-                priority: event.target.value as Priority | "",
-              }))
-            }
-            aria-label="Priority"
-            className="flex-1 rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
-          >
-            <option value="">No priority</option>
-            {PRIORITIES.map((priority) => (
-              <option key={priority} value={priority}>
-                {PRIORITY_LABELS[priority]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <input
-          value={formState.labels}
-          onChange={(event) =>
-            setFormState((prev) => ({ ...prev, labels: event.target.value }))
-          }
-          placeholder="Labels (comma-separated)"
-          aria-label="Labels"
-          className="w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white"
+        <CardFormFields
+          state={formState}
+          onChange={setFormState}
+          titleLabel="Card title"
+          detailsLabel="Card details"
         />
         <div className="flex items-center gap-2">
           <button
@@ -224,7 +150,7 @@ export const KanbanCard = ({ card, accent, onDelete, onEdit, onAddComment }: Kan
           </button>
           <button
             type="button"
-            onClick={cancelEditing}
+            onClick={() => setIsEditing(false)}
             title="Cancel"
             aria-label="Cancel"
             className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-[var(--stroke)] text-[var(--gray-text)] transition hover:bg-[var(--surface)] hover:text-[var(--navy-dark)]"

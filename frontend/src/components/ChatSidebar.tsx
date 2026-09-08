@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import clsx from "clsx";
 import { sendChatMessage } from "@/lib/api";
 import { CloseIcon, SendIcon, SparkIcon } from "@/components/icons";
@@ -29,8 +29,6 @@ export const ChatSidebar = ({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  const hasMessages = useMemo(() => messages.length > 0, [messages.length]);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -106,7 +104,7 @@ export const ChatSidebar = ({
         ref={scrollRef}
         className="board-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
       >
-        {!hasMessages ? (
+        {messages.length === 0 ? (
           <div className="space-y-3">
             <p className="text-sm leading-6 text-[var(--gray-text)]">
               Ask me to create, edit, move, or summarize cards.

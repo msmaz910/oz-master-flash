@@ -16,6 +16,9 @@ from models import get_db, init_db, empty_board_data, User, Board, Conversation,
 from security import hash_password, verify_password, generate_token
 from ai_service import ai_service
 
+# Conversation history sent to (and stored for) the AI, newest last.
+MAX_HISTORY_MESSAGES = 20
+
 # Pydantic schemas
 class BoardUpdateRequest(BaseModel):
     board: Optional[Any] = None
@@ -28,11 +31,7 @@ class ChatRequest(BaseModel):
     question: str
     boardId: int
 
-class RegisterRequest(BaseModel):
-    username: str
-    password: str
-
-class LoginRequest(BaseModel):
+class CredentialsRequest(BaseModel):
     username: str
     password: str
 
@@ -57,12 +56,18 @@ async def test_ai(prompt: str = "What is 2+2?"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def bearer_token(authorization: Optional[str]) -> Optional[str]:
+    """Extract the token from an `Authorization: Bearer <token>` header."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    return authorization.removeprefix("Bearer ").strip()
+
 def get_current_user(
     authorization: Optional[str] = Header(None), db: Session = Depends(get_db)
 ) -> User:
-    if not authorization or not authorization.startswith("Bearer "):
+    token = bearer_token(authorization)
+    if token is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    token = authorization.removeprefix("Bearer ").strip()
     session = db.query(UserSession).filter(UserSession.token == token).first()
     if not session:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
@@ -75,7 +80,7 @@ def get_owned_board(db: Session, user: User, board_id: int) -> Board:
     return board
 
 @app.post("/api/auth/register", status_code=201)
-async def register(request: RegisterRequest, db: Session = Depends(get_db)):
+async def register(request: CredentialsRequest, db: Session = Depends(get_db)):
     username = request.username.strip()
     if not username:
         raise HTTPException(status_code=400, detail="Username is required")
@@ -101,7 +106,7 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
     return {"token": token, "username": user.username}
 
 @app.post("/api/auth/login")
-async def login(request: LoginRequest, db: Session = Depends(get_db)):
+async def login(request: CredentialsRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == request.username.strip()).first()
     if not user or not verify_password(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username or password")
@@ -113,8 +118,8 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/logout")
 async def logout(authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.removeprefix("Bearer ").strip()
+    token = bearer_token(authorization)
+    if token is not None:
         db.query(UserSession).filter(UserSession.token == token).delete()
         db.commit()
     return {"message": "Logged out"}
@@ -158,8 +163,8 @@ async def update_board(
     board = get_owned_board(db, user, board_id)
 
     if request.board is not None:
-        board_content = request.board
-        board.data = json.dumps(board_content) if isinstance(board_content, dict) else board_content
+        # The endpoint accepts either a JSON string or an already-decoded object.
+        board.data = json.dumps(request.board) if isinstance(request.board, dict) else request.board
 
     if request.name is not None:
         stripped_name = request.name.strip()
@@ -190,11 +195,9 @@ def validate_board_update(current_board: dict, updated_board: dict) -> tuple[boo
     Returns: (is_valid, error_message)
     """
     try:
-        # Check structure
         if "columns" not in updated_board or "cards" not in updated_board:
             return False, "Board must have 'columns' and 'cards' properties"
 
-        # Get current column IDs
         current_col_ids = {col["id"] for col in current_board["columns"]}
 
         # Check no unknown column IDs (AI can't invent new columns)
@@ -231,13 +234,9 @@ async def chat_with_ai(
 ):
     """Chat with AI about the kanban board."""
     try:
-        # Get board owned by the authenticated user
         board = get_owned_board(db, user, request.boardId)
-
-        # Parse current board state
         board_state = json.loads(board.data)
 
-        # Get or create conversation
         conversation = db.query(Conversation).filter(
             Conversation.user_id == user.id,
             Conversation.board_id == board.id
@@ -253,40 +252,29 @@ async def chat_with_ai(
             db.commit()
             db.refresh(conversation)
 
-        # Parse conversation history and cap at 20 messages
-        history = json.loads(conversation.messages)
-        if len(history) > 20:
-            history = history[-20:]
+        history = json.loads(conversation.messages)[-MAX_HISTORY_MESSAGES:]
 
-        # Call AI service
         ai_response = await ai_service.chat_with_kanban(
             request.question,
             board_state,
             history
         )
+        answer = ai_response.get("response", "")
+        kanban_update = ai_response.get("kanbanUpdate")
 
-        # Process kanban update if present
-        if "kanbanUpdate" in ai_response and ai_response["kanbanUpdate"]:
-            is_valid, error_msg = validate_board_update(board_state, ai_response["kanbanUpdate"])
+        if kanban_update:
+            is_valid, error_msg = validate_board_update(board_state, kanban_update)
             if not is_valid:
                 raise HTTPException(status_code=400, detail=f"Invalid board update: {error_msg}")
-
-            # Apply the update
-            board.data = json.dumps(ai_response["kanbanUpdate"])
+            board.data = json.dumps(kanban_update)
             db.commit()
 
-        # Update conversation history (cap stored history at 20 messages)
         history.append({"role": "user", "content": request.question})
-        history.append({"role": "assistant", "content": ai_response.get("response", "")})
-        if len(history) > 20:
-            history = history[-20:]
-        conversation.messages = json.dumps(history)
+        history.append({"role": "assistant", "content": answer})
+        conversation.messages = json.dumps(history[-MAX_HISTORY_MESSAGES:])
         db.commit()
 
-        return {
-            "response": ai_response.get("response", ""),
-            "boardUpdated": "kanbanUpdate" in ai_response and ai_response["kanbanUpdate"] is not None
-        }
+        return {"response": answer, "boardUpdated": kanban_update is not None}
     except HTTPException:
         raise
     except Exception as e:

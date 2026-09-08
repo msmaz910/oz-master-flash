@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import type { ActivityEntry } from "@/lib/kanban";
+import { useClickOutside } from "@/lib/useClickOutside";
 import { CloseIcon } from "@/components/icons";
 
 type ActivityPanelProps = {
@@ -10,15 +11,7 @@ type ActivityPanelProps = {
 export const ActivityPanel = ({ entries, onClose }: ActivityPanelProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose]);
+  useClickOutside(containerRef, onClose);
 
   return (
     <div

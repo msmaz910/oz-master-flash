@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { BoardIcon, LogoutIcon } from "@/components/icons";
 import { login, register, setAuthToken } from "@/lib/api";
 
-interface LoginProps {
+type LoginProps = {
   onAuthenticated: (username: string) => void;
-}
+};
 
 const fieldClass =
   "w-full rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)] focus:bg-white";
@@ -18,15 +18,16 @@ export const Login = ({ onAuthenticated }: LoginProps) => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const isSignIn = mode === "signin";
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
     setError("");
     setSubmitting(true);
     try {
-      const result =
-        mode === "signin"
-          ? await login(username, password)
-          : await register(username, password);
+      const result = isSignIn
+        ? await login(username, password)
+        : await register(username, password);
       setAuthToken(result.token);
       onAuthenticated(result.username);
     } catch (err) {
@@ -40,6 +41,11 @@ export const Login = ({ onAuthenticated }: LoginProps) => {
     setMode((prev) => (prev === "signin" ? "signup" : "signin"));
     setError("");
   };
+
+  let submitLabel = isSignIn ? "Sign In" : "Create Account";
+  if (submitting) {
+    submitLabel = "Please wait...";
+  }
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-6">
@@ -56,7 +62,7 @@ export const Login = ({ onAuthenticated }: LoginProps) => {
               Kanban Studio
             </h1>
             <p className="mt-2 text-sm text-[var(--gray-text)]">
-              {mode === "signin"
+              {isSignIn
                 ? "Sign in to access your boards"
                 : "Create an account to get started"}
             </p>
@@ -74,7 +80,7 @@ export const Login = ({ onAuthenticated }: LoginProps) => {
                 id="username"
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(event) => setUsername(event.target.value)}
                 className={fieldClass}
                 placeholder="Enter username"
                 autoComplete="username"
@@ -93,11 +99,11 @@ export const Login = ({ onAuthenticated }: LoginProps) => {
                 id="password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(event) => setPassword(event.target.value)}
                 className={fieldClass}
                 placeholder="Enter password"
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                minLength={mode === "signup" ? 6 : undefined}
+                autoComplete={isSignIn ? "current-password" : "new-password"}
+                minLength={isSignIn ? undefined : 6}
                 required
               />
             </div>
@@ -114,11 +120,7 @@ export const Login = ({ onAuthenticated }: LoginProps) => {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--secondary-purple)] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <LogoutIcon className="h-4 w-4 rotate-180" />
-              {submitting
-                ? "Please wait..."
-                : mode === "signin"
-                  ? "Sign In"
-                  : "Create Account"}
+              {submitLabel}
             </button>
           </form>
 
@@ -127,12 +129,12 @@ export const Login = ({ onAuthenticated }: LoginProps) => {
             onClick={toggleMode}
             className="mt-4 w-full text-center text-xs font-semibold text-[var(--secondary-purple)] transition hover:brightness-110"
           >
-            {mode === "signin"
+            {isSignIn
               ? "Need an account? Sign up"
               : "Already have an account? Sign in"}
           </button>
 
-          {mode === "signin" && (
+          {isSignIn && (
             <div className="mt-6 rounded-xl bg-[var(--surface)] px-3 py-2 text-center text-xs text-[var(--gray-text)]">
               Demo credentials: user / password
             </div>

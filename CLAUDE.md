@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Project Management web app: multi-user accounts, each with multiple Kanban boards, plus an AI chat assistant that can propose board updates. Docker-first deployment.
 
-**Stack**: Next.js 16 (React 19, TypeScript, Tailwind 4) + FastAPI (Python, SQLAlchemy, SQLite) + OpenRouter LLM
+**Stack**: Next.js 16 (React 19, TypeScript, Tailwind 4) + FastAPI (Python, SQLAlchemy, SQLite) + Anthropic API (Claude)
 
 ## Development Commands
 
@@ -47,7 +47,7 @@ The Dockerfile builds the Next.js app as a static export (`out/`), copies it int
 - `backend/main.py` — all FastAPI routes
 - `backend/models.py` — SQLAlchemy ORM: User (1:N) → Board (JSON) → Conversation; also `UserSession` (bearer tokens)
 - `backend/security.py` — password hashing (PBKDF2-HMAC-SHA256, stdlib only) and session token generation
-- `backend/ai_service.py` — OpenRouter client and prompt logic
+- `backend/ai_service.py` — Anthropic client and prompt logic
 
 ### Data flow quirk: double-serialized board
 The backend stores board state as a JSON string in the `board` column. The API returns `{"board": "{\"columns\": [...]}"}` — a JSON string inside JSON. The frontend must parse twice:
@@ -78,7 +78,7 @@ Columns can be created (`AddColumnForm`) and deleted, but a column can only be d
 
 Create `backend/.env` with:
 ```
-OPENROUTER_API_KEY=your_key_here
+ANTHROPIC_API_KEY=your_key_here
 ```
 
 The backend loads this via `python-dotenv` at startup.
