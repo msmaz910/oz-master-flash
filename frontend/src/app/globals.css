@@ -55,7 +55,7 @@ body {
 }
 
 .board-scroll::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(36, 31, 24, 0.05);
 }
 
 .board-scroll::-webkit-scrollbar-thumb {

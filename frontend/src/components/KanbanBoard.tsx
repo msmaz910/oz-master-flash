@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -20,6 +20,7 @@ import { AddColumnForm } from "@/components/AddColumnForm";
 import { FilterBar } from "@/components/FilterBar";
 import {
   BoardIcon,
+  ChevronDownIcon,
   HistoryIcon,
   LogoutIcon,
   PanelIcon,
@@ -97,12 +98,50 @@ export const KanbanBoard = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filters, setFilters] = useState<CardFilters>(EMPTY_FILTERS);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [columnScroll, setColumnScroll] = useState({ left: false, right: false });
+  const columnScrollRef = useRef<HTMLElement>(null);
+  const columnListRef = useRef<HTMLElement>(null);
 
   const actor = username ?? "Unknown";
   const logActivity = (nextBoard: BoardData, message: string): BoardData => ({
     ...nextBoard,
     activity: appendActivity(nextBoard.activity, message, actor),
   });
+
+  // Columns can overflow the visible width; track scroll position so we can
+  // show edge fades + arrow buttons instead of relying on the scrollbar alone.
+  useEffect(() => {
+    // Refs attach only once the board (not the loading spinner) is on screen,
+    // so this can't be a mount-once effect — it has to re-run once `loading`
+    // flips to false and the real scroll container exists.
+    const scrollEl = columnScrollRef.current;
+    const listEl = columnListRef.current;
+    if (!scrollEl || !listEl) return;
+
+    const updateColumnScroll = () => {
+      setColumnScroll({
+        left: scrollEl.scrollLeft > 4,
+        right: scrollEl.scrollLeft + scrollEl.clientWidth < scrollEl.scrollWidth - 4,
+      });
+    };
+
+    updateColumnScroll();
+    scrollEl.addEventListener("scroll", updateColumnScroll, { passive: true });
+
+    // jsdom (unit tests) has no ResizeObserver; the browser always does.
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateColumnScroll) : null;
+    resizeObserver?.observe(listEl);
+
+    return () => {
+      scrollEl.removeEventListener("scroll", updateColumnScroll);
+      resizeObserver?.disconnect();
+    };
+  }, [loading]);
+
+  const scrollColumnsBy = (direction: 1 | -1) => {
+    columnScrollRef.current?.scrollBy({ left: direction * 360, behavior: "smooth" });
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -565,36 +604,67 @@ export const KanbanBoard = ({
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <main
-            className="board-scroll min-w-0 flex-1 overflow-x-auto px-5 py-5"
-            style={{ containerType: "inline-size" }}
-          >
-            <section className="flex h-full min-h-[420px] items-stretch gap-4">
-              {board.columns.map((column, index) => (
-                <KanbanColumn
-                  key={column.id}
-                  column={column}
-                  accent={accentFor(index)}
-                  cards={
-                    column.cardIds
-                      .map((cardId) => board.cards[cardId])
-                      .filter(Boolean)
-                      .filter((card) => cardMatchesFilters(card, filters)) as Card[]
-                  }
-                  totalCardCount={column.cardIds.length}
-                  canDelete={column.cardIds.length === 0 && board.columns.length > 1}
-                  onRename={handleRenameColumn}
-                  onRenameBlur={handleRenameColumnBlur}
-                  onAddCard={handleAddCard}
-                  onDeleteCard={handleDeleteCard}
-                  onEditCard={handleEditCard}
-                  onDeleteColumn={handleDeleteColumn}
-                  onAddComment={handleAddComment}
-                />
-              ))}
-              <AddColumnForm onAdd={handleAddColumn} />
-            </section>
-          </main>
+          <div className="relative min-w-0 flex-1">
+            <main
+              ref={columnScrollRef}
+              className="board-scroll h-full overflow-x-auto px-5 py-5"
+              style={{ containerType: "inline-size" }}
+            >
+              <section ref={columnListRef} className="flex h-full min-h-[420px] items-stretch gap-4">
+                {board.columns.map((column, index) => (
+                  <KanbanColumn
+                    key={column.id}
+                    column={column}
+                    accent={accentFor(index)}
+                    cards={
+                      column.cardIds
+                        .map((cardId) => board.cards[cardId])
+                        .filter(Boolean)
+                        .filter((card) => cardMatchesFilters(card, filters)) as Card[]
+                    }
+                    totalCardCount={column.cardIds.length}
+                    canDelete={column.cardIds.length === 0 && board.columns.length > 1}
+                    onRename={handleRenameColumn}
+                    onRenameBlur={handleRenameColumnBlur}
+                    onAddCard={handleAddCard}
+                    onDeleteCard={handleDeleteCard}
+                    onEditCard={handleEditCard}
+                    onDeleteColumn={handleDeleteColumn}
+                    onAddComment={handleAddComment}
+                  />
+                ))}
+                <AddColumnForm onAdd={handleAddColumn} />
+              </section>
+            </main>
+
+            {columnScroll.left && (
+              <>
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-14 bg-gradient-to-r from-[var(--surface)] to-transparent" />
+                <button
+                  type="button"
+                  onClick={() => scrollColumnsBy(-1)}
+                  aria-label="Scroll columns left"
+                  className="absolute left-3 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-[var(--stroke)] bg-white/95 text-[var(--navy-dark)] shadow-[var(--shadow-soft)] transition hover:bg-white"
+                >
+                  <ChevronDownIcon className="h-4 w-4 rotate-90" />
+                </button>
+              </>
+            )}
+
+            {columnScroll.right && (
+              <>
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l from-[var(--surface)] to-transparent" />
+                <button
+                  type="button"
+                  onClick={() => scrollColumnsBy(1)}
+                  aria-label="Scroll columns right"
+                  className="absolute right-3 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-[var(--stroke)] bg-white/95 text-[var(--navy-dark)] shadow-[var(--shadow-soft)] transition hover:bg-white"
+                >
+                  <ChevronDownIcon className="h-4 w-4 -rotate-90" />
+                </button>
+              </>
+            )}
+          </div>
           <DragOverlay dropAnimation={null}>
             {activeCard ? (
               <div className="w-[260px]">
